@@ -1,11 +1,10 @@
 [compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
 
 buildConfig {
-    useKotlinOutput() // { topLevelConstants = true }
+    useKotlinOutput()
 
     className('BuildConfig')
     packageName('fr.mesabloo.heavymachdefense')
-    // exposeObjectWithName = 'YourAwesomePublicConfig'
 
     if (project.hasProperty("releaseType")) {
         def releaseType = project.property("releaseType")
@@ -25,16 +24,13 @@ buildConfig {
 }
 
 compileJava {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 compileKotlin {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
-
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11
+        jvmTarget = "17"
     }
 
     dependsOn generateBuildConfig
@@ -42,10 +38,7 @@ compileKotlin {
 
 sourceSets {
     main.java.srcDirs = ["src/java"]
-    main.kotlin.srcDirs = ["src/kotlin", "${buildDir}/generated/source/buildConfig/main/main"]
+    main.kotlin.srcDirs = ["src/kotlin", "${layout.buildDirectory.get()}/generated/sources/buildConfig/main"]
 }
 
 eclipse.project.name = appName + "-core"
-dependencies {
-    implementation 'org.jetbrains.kotlin:kotlin-script-runtime:1.6.21'
-}

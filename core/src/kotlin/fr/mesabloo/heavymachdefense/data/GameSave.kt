@@ -74,7 +74,33 @@ data class GameSave(
         @Transient
         const val PREFERENCES_PATH = "hm-defense/saves"
     }
+
+    @Throws(InvalidSaveException::class)
+    fun checkValid() {
+        if (lastStageCompleted !in 0..79)
+            throw InvalidSaveException("lastStageCompleted must be in 0..79; found $lastStageCompleted")
+        if (credits < 0)
+            throw InvalidSaveException("credits must be non-negative; found $credits")
+        if (buildSlots.isEmpty() || buildSlots.size > 7)
+            throw InvalidSaveException("buildSlots size must be 1..7; found ${buildSlots.size}")
+
+        for (slot in buildSlots) {
+            when (slot) {
+                is MachineSlot -> {
+                    if ((machineUpgrades[slot.kind] ?: 0) == 0)
+                        throw InvalidSaveException("buildSlots contains locked machine ${slot.kind}")
+                }
+                is TurretSlot -> {
+                    if ((turretUpgrades[slot.kind] ?: 0) == 0)
+                        throw InvalidSaveException("buildSlots contains locked turret ${slot.kind}")
+                }
+                is SpecialSlot -> {}
+            }
+        }
+    }
 }
+
+class InvalidSaveException(reason: String) : Exception("Invalid save: $reason")
 
 object DateTimestampSerializer : KSerializer<Date> {
     override val descriptor: SerialDescriptor

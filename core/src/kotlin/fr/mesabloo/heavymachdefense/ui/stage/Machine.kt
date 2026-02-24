@@ -108,11 +108,32 @@ class Machine(kind: MachineKind, level: Int) : Group() {
      * @param moveSpeed average forward speed in pixels/sec
      */
     fun startWalkingAnimation(moveSpeed: Float) {
-        val frames = this.feetFrames ?: return
-        val framesFlipped = this.feetFramesFlipped ?: return
-        val lFoot = this.leftFoot ?: return
-        val rFoot = this.rightFoot ?: return
         val pBody = this.physicsBody ?: return
+
+        // Machines without feet (e.g. tanker): smooth constant movement, no foot animation
+        if (this.feetFrames == null) {
+            this.addAction(object : Action() {
+                override fun act(delta: Float): Boolean {
+                    val machine = actor as Machine
+                    if (!machine.isAlive) {
+                        pBody.setLinearVelocity(0f, 0f)
+                        return true
+                    }
+                    if (!machine.walking) {
+                        pBody.setLinearVelocity(0f, 0f)
+                        return false
+                    }
+                    pBody.setLinearVelocity(0f, moveSpeed / PPM)
+                    return false
+                }
+            })
+            return
+        }
+
+        val frames = this.feetFrames!!
+        val framesFlipped = this.feetFramesFlipped!!
+        val lFoot = this.leftFoot!!
+        val rFoot = this.rightFoot!!
 
         lFoot.isVisible = true
         rFoot.isVisible = true

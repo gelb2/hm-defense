@@ -218,14 +218,18 @@ class StageScreen(
             it.setPosition(22f, 692f - it.height)
         })
 
-        this.background.addActor(Group().also {
+        val slotsContent = Group().also {
             this.machineSlots = it
 
             ifDev {
                 this.save.buildSlots = MachineKind.values().map { MachineSlot(it) }.toMutableList()
             }
 
-            var currentY = SLOT_MENU_HEIGHT - 76f
+            val slotCount = this.save.buildSlots.size
+            val contentHeight = 76f + slotCount * 102f
+            it.setSize(SLOT_MENU_WIDTH, contentHeight)
+
+            var currentY = contentHeight - 76f
             for (slot in this.save.buildSlots) {
                 it.addActor(when (slot) {
                     is MachineSlot -> MachineBuildSlot(
@@ -260,10 +264,15 @@ class StageScreen(
                 currentY -= 102f
             }
 
+            it.alpha = 1f
+            it.touchable = Touchable.enabled
+        }
+        this.background.addActor(ScrollPane(slotsContent).also {
             it.setPosition(640f, 966f - SLOT_MENU_HEIGHT)
             it.setSize(SLOT_MENU_WIDTH, SLOT_MENU_HEIGHT)
-
-            it.alpha = 1f
+            it.setScrollingDisabled(true, false)
+            it.setOverscroll(false, false)
+            it.setFlickScroll(true)
             it.touchable = Touchable.enabled
         })
         this.background.addActor(Group().also {

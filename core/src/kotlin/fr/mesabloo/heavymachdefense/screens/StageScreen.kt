@@ -25,8 +25,10 @@ import ktx.box2d.body
 import ktx.box2d.box
 import fr.mesabloo.heavymachdefense.data.Specials
 import fr.mesabloo.heavymachdefense.listeners.stage.*
+import fr.mesabloo.heavymachdefense.managers.BackgroundMusicManager
 import fr.mesabloo.heavymachdefense.managers.WaveManager
 import fr.mesabloo.heavymachdefense.managers.animationManager
+import fr.mesabloo.heavymachdefense.managers.backgroundMusicManager
 import fr.mesabloo.heavymachdefense.ifDev
 import fr.mesabloo.heavymachdefense.managers.assets.StageAssetsManager
 import fr.mesabloo.heavymachdefense.managers.assets.assetManager
@@ -129,6 +131,10 @@ class StageScreen(
 
     private lateinit var systemMenu: SystemMenu
 
+    private val bgm = backgroundMusicManager.load(BackgroundMusicManager.GAMEPLAY).also {
+        it.isLooping = true
+        it.volume = 0f
+    }
     private var backgroundMusicVolume: Float = 1.0f
     private var effectsVolume: Float = 1.0f
 
@@ -163,6 +169,9 @@ class StageScreen(
 
         if (this.isLoading)
             return
+
+        this.bgm.volume = this.backgroundMusicVolume
+        this.bgm.play()
 
         this.systemMenu = SystemMenu(this::backgroundMusicVolume, this::effectsVolume, this)
 
@@ -606,6 +615,9 @@ class StageScreen(
     override fun render(delta: Float) {
         this.menuTweenManager.update(delta)
 
+        // Sync BGM volume with slider
+        this.bgm.volume = this.backgroundMusicVolume
+
         // update cell storage capacity
         this.maxCells =
             this.upgrades.cell_storage[this.save.mainUpgrades[UpgradeKind.CELL_STORAGE]?.minus(1)
@@ -744,6 +756,8 @@ class StageScreen(
 
     override fun dispose() {
         super.dispose()
+
+        this.bgm.stop()
 
         this.gameResultOverlay?.dispose()
         this.gameWorld.dispose()

@@ -1,5 +1,6 @@
 package fr.mesabloo.heavymachdefense.ai
 
+import com.badlogic.gdx.ai.btree.BehaviorTree
 import com.badlogic.gdx.ai.steer.Steerable
 import com.badlogic.gdx.math.Vector2
 
@@ -11,9 +12,13 @@ import com.badlogic.gdx.math.Vector2
  */
 abstract class GameObject : Steerable<Vector2> {
     abstract val objects: MutableList<GameObject>
+    abstract val team: Team
 
     /** Pair of (attack range, detection range), or null if this object has no range. */
     abstract val range: Pair<Float, Float>?
+
+    /** Shots per second. */
+    abstract val attackSpeed: Float
 
     private var _target: GameObject? = null
 
@@ -38,4 +43,19 @@ abstract class GameObject : Steerable<Vector2> {
     abstract fun walk()
 
     abstract fun stopInPlace()
+
+    /** Rotate visual toward the given target. */
+    abstract fun aimAt(target: GameObject)
+
+    /** Rotate visual back to default forward direction. */
+    abstract fun aimDefault()
+
+    /** Behavior tree driving this entity's AI. */
+    var behaviorTree: BehaviorTree<GameObject>? = null
+
+    /** Callback invoked when this entity fires at its locked target. */
+    var onShoot: ((shooter: GameObject, target: GameObject) -> Unit)? = null
+
+    /** Cooldown tracker for shooting (decremented each frame). */
+    var shootCooldownRemaining: Float = 0f
 }

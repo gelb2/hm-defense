@@ -7,7 +7,7 @@ class LockAnyTargetNearRangeTask : LeafTask<GameObject>() {
     override fun execute(): Status {
         val detectionRange = `object`.range?.second ?: return Status.FAILED
         val nearby = `object`.objects.lastOrNull { obj ->
-            obj !== `object` && obj.isAlive &&
+            obj !== `object` && obj.isAlive && obj.team != `object`.team &&
                 obj.getPosition().dst(`object`.getPosition()) < detectionRange
         } ?: return Status.FAILED
 

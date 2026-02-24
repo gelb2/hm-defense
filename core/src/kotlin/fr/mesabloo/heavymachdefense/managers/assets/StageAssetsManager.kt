@@ -35,6 +35,12 @@ class StageAssetsManager : Disposable {
 
         const val SHIPS = "gfx/models/other/ships.atlas"
 
+        const val ALLY_BULLETS = "gfx/models/bullets/ally.atlas"
+        const val SHELL_BULLETS = "gfx/models/bullets/shell.atlas"
+        const val ENEMY_BULLETS = "gfx/models/bullets/enemy-bullet.atlas"
+
+        const val EFFECTS = "gfx/models/effects/effects.atlas"
+
         const val ALLY_BASE = "gfx/models/base/ally-base.atlas"
         const val ENEMY_BASE = "gfx/models/base/enemy-base.atlas"
     }
@@ -121,6 +127,9 @@ class StageAssetsManager : Disposable {
         TANK_WEAPONS,
         ENEMY_PLANE,
         SHIPS,
+        ALLY_BULLETS,
+        SHELL_BULLETS,
+        ENEMY_BULLETS,
         ALLY_BASE,
         ENEMY_BASE,
         UI.BUTTONS,
@@ -130,7 +139,8 @@ class StageAssetsManager : Disposable {
         UI.UPGRADE_MENU_BUTTONS,
         Dialog.SYSTEM_MENU_BUTTONS,
         UI.UPGRADE_EQUIPMENT,
-        UI.SPECIAL_ICONS
+        UI.SPECIAL_ICONS,
+        EFFECTS
     )
 
     private fun allTextures() = this.stageLevel?.let {

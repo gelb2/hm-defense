@@ -6,6 +6,7 @@ import com.badlogic.gdx.ai.btree.Task
 class UnlockTargetTask : LeafTask<GameObject>() {
     override fun execute(): Status {
         `object`.forgetTarget()
+        `object`.aimDefault()
         return Status.SUCCEEDED
     }
 

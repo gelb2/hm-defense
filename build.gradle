@@ -17,6 +17,26 @@ plugins {
     id 'org.jetbrains.kotlin.plugin.serialization' version '2.1.0'
 }
 
+configurations {
+    tools
+}
+
+dependencies {
+    tools "com.badlogicgames.gdx:gdx-tools:1.13.1"
+    tools "com.badlogicgames.gdx:gdx-backend-lwjgl3:1.13.1"
+    tools "com.badlogicgames.gdx:gdx-platform:1.13.1:natives-desktop"
+}
+
+task packEffects(type: JavaExec) {
+    classpath = configurations.tools
+    mainClass = 'com.badlogic.gdx.tools.texturepacker.TexturePacker'
+    args = [
+        file('build/tmp/effects-packed-input').absolutePath,
+        file('core/assets/gfx/models/effects').absolutePath,
+        'effects'
+    ]
+}
+
 allprojects {
     apply plugin: "eclipse"
     apply plugin: "java"

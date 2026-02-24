@@ -2,12 +2,18 @@ package fr.mesabloo.heavymachdefense.screens
 
 import aurelienribon.tweenengine.TweenManager
 import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.ai.btree.utils.BehaviorTreeParser
+import com.badlogic.gdx.graphics.g2d.TextureAtlas
+import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.scenes.scene2d.Group
 import com.badlogic.gdx.scenes.scene2d.Touchable
 import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane
 import com.badlogic.gdx.physics.box2d.BodyDef
 import fr.mesabloo.heavymachdefense.MainGame
 import fr.mesabloo.heavymachdefense.PPM
+import fr.mesabloo.heavymachdefense.ai.EnemyTankEntity
+import fr.mesabloo.heavymachdefense.ai.GameObject
+import fr.mesabloo.heavymachdefense.ai.MachineEntity
 import fr.mesabloo.heavymachdefense.data.*
 import fr.mesabloo.heavymachdefense.entities.buildMachineTemplate
 import fr.mesabloo.heavymachdefense.entities.createBases
@@ -16,14 +22,19 @@ import ktx.box2d.body
 import ktx.box2d.box
 import fr.mesabloo.heavymachdefense.data.Specials
 import fr.mesabloo.heavymachdefense.listeners.stage.*
+import fr.mesabloo.heavymachdefense.managers.WaveManager
 import fr.mesabloo.heavymachdefense.managers.animationManager
 import fr.mesabloo.heavymachdefense.managers.assets.StageAssetsManager
+import fr.mesabloo.heavymachdefense.managers.assets.assetManager
 import fr.mesabloo.heavymachdefense.managers.assets.stageAssetsManager
 import fr.mesabloo.heavymachdefense.timers.cellMiningTimer
 import fr.mesabloo.heavymachdefense.ui.stage.*
 import fr.mesabloo.heavymachdefense.ui.stage.buttons.*
 import fr.mesabloo.heavymachdefense.ui.stage.dialog.SystemMenu
+import fr.mesabloo.heavymachdefense.ui.stage.EnemyTank
 import fr.mesabloo.heavymachdefense.ui.stage.game.AllyBase
+import fr.mesabloo.heavymachdefense.ui.stage.game.Bullet
+import fr.mesabloo.heavymachdefense.ui.stage.game.ExplosionEffect
 import fr.mesabloo.heavymachdefense.ui.stage.slots.MachineBuildSlot
 import fr.mesabloo.heavymachdefense.ui.stage.slots.SpecialBuildSlot
 import fr.mesabloo.heavymachdefense.ui.stage.slots.TurretBuildSlot
@@ -50,11 +61,18 @@ class StageScreen(
         const val SLOT_MENU_WIDTH = 128f
         const val SLOT_MENU_HEIGHT = 710f
         const val MACHINE_SPEED = 12.5f // pixels per second
+        const val ENEMY_SPEED = 10f // pixels per second
     }
 
     private lateinit var buildQueue: BuildQueue
     private lateinit var allyBase: AllyBase
     private lateinit var gameWorld: GameWorld
+    private lateinit var waveManager: WaveManager
+
+    private val gameObjects = mutableListOf<GameObject>()
+
+    private val btreeSource by lazy { Gdx.files.internal("ai/machine.btree").readString() }
+    private val btreeParser = BehaviorTreeParser<GameObject>(BehaviorTreeParser.DEBUG_NONE)
 
     private val upgrades: Upgrades = Json.decodeFromString(Gdx.files.internal("data/upgrades.json").readString())
     private val builds: Builds = Json {
@@ -324,10 +342,31 @@ class StageScreen(
         this.background.addActor(Radar(scrollpane).also {
             it.setPosition(22f, 698f)
         })
+
+        // Load wave data for this level
+        val wavePath = "data/waves/level-${level.toString().padStart(2, '0')}.json"
+        val waveFile = Gdx.files.internal(wavePath)
+        if (waveFile.exists()) {
+            val levelWaves: LevelWaves = Json.decodeFromString(waveFile.readString())
+            this.waveManager = WaveManager(levelWaves) { info -> spawnEnemyTank(info) }
+        } else {
+            this.waveManager = WaveManager(LevelWaves(emptyList())) {}
+        }
     }
 
     private fun spawnMachine(kind: MachineKind, level: Int) {
         val machine = buildMachineTemplate(kind, level)
+
+        // Apply combat stats from build-info
+        val stats = this.builds.machines[Pair(kind, level)]
+        if (stats != null) {
+            machine.hp = stats.hp
+            machine.maxHp = stats.hp
+            machine.attackDamage = stats.attack
+            machine.attackSpeed = stats.attackSpeed
+            machine.attackRange = stats.range
+            machine.detectionRange = stats.detectionRange
+        }
 
         // Face upward (only for terrain machines, not UI slots)
         machine.setOrigin(machine.width / 2f, machine.height / 2f)
@@ -346,7 +385,7 @@ class StageScreen(
             }
             userData = machine
             position.set(
-                (256f + machine.width / 2f) / PPM,
+                (128f + Math.random().toFloat() * 256f) / PPM,
                 (160f + machine.height / 2f) / PPM
             )
         }
@@ -354,6 +393,95 @@ class StageScreen(
         // Walking animation controls body velocity (step-based movement)
         machine.physicsBody = body
         machine.startWalkingAnimation(MACHINE_SPEED)
+
+        // Register AI entity
+        val entity = MachineEntity(machine, body, this.gameObjects, MACHINE_SPEED)
+        entity.behaviorTree = this.btreeParser.parse(this.btreeSource, entity)
+        entity.onShoot = { shooter, target ->
+            val shooterPos = shooter.getPosition().cpy().scl(PPM)
+            val targetPos = target.getPosition().cpy().scl(PPM)
+            val shooterEntity = shooter as MachineEntity
+            val bulletRegion = stageAssetsManager.unsafeRegion(StageAssetsManager.ALLY_BULLETS, "00")
+            val bullet = Bullet(
+                bulletRegion, shooterPos, targetPos, 350f,
+                shooterEntity.machine.attackDamage,
+                { target.isAlive },
+                { hitPos ->
+                    when (target) {
+                        is EnemyTankEntity -> target.tank.hp -= shooterEntity.machine.attackDamage
+                    }
+                    spawnEffect("damage", hitPos)
+                },
+                {}
+            )
+            this.terrain.addActor(bullet)
+        }
+        this.gameObjects.add(entity)
+    }
+
+    private fun spawnEffect(effectName: String, pixelPos: Vector2) {
+        val atlas = assetManager.get<TextureAtlas>(StageAssetsManager.EFFECTS)
+        val regions = atlas.findRegions(effectName)
+        if (regions.size == 0) return
+        val effect = ExplosionEffect(regions)
+        effect.setPosition(pixelPos.x - effect.width / 2f, pixelPos.y - effect.height / 2f)
+        this.terrain.addActor(effect)
+    }
+
+    private fun spawnEnemyTank(info: EnemySpawnInfo) {
+        val tank = EnemyTank(info.tankType)
+        tank.hp = info.hp
+        tank.maxHp = info.hp
+        tank.attackDamage = info.attack
+        tank.attackSpeed = info.attackSpeed
+        tank.attackRange = info.range
+        tank.detectionRange = info.detectionRange
+
+        tank.setOrigin(tank.width / 2f, tank.height / 2f)
+        tank.rotation = -90f // face downward
+
+        val spawnX = (128f + Math.random().toFloat() * 256f) / PPM
+        val spawnY = (1900f + tank.height / 2f) / PPM
+
+        val body = this.gameWorld.world.body {
+            type = BodyDef.BodyType.KinematicBody
+            box(
+                width = tank.width / PPM,
+                height = tank.height / PPM
+            ) {
+                density = 10f
+                restitution = 0f
+                friction = 1f
+                isSensor = false
+            }
+            userData = tank
+            position.set(spawnX, spawnY)
+        }
+
+        tank.physicsBody = body
+
+        val entity = EnemyTankEntity(tank, body, this.gameObjects, info.speed)
+        entity.behaviorTree = this.btreeParser.parse(this.btreeSource, entity)
+        entity.onShoot = { shooter, target ->
+            val shooterPos = shooter.getPosition().cpy().scl(PPM)
+            val targetPos = target.getPosition().cpy().scl(PPM)
+            val shooterEntity = shooter as EnemyTankEntity
+            val bulletRegion = stageAssetsManager.unsafeRegion(StageAssetsManager.ENEMY_BULLETS, "00")
+            val bullet = Bullet(
+                bulletRegion, shooterPos, targetPos, 300f,
+                shooterEntity.tank.attackDamage,
+                { target.isAlive },
+                { hitPos ->
+                    when (target) {
+                        is MachineEntity -> target.machine.hp -= shooterEntity.tank.attackDamage
+                    }
+                    spawnEffect("damage", hitPos)
+                },
+                {}
+            )
+            this.terrain.addActor(bullet)
+        }
+        this.gameObjects.add(entity)
     }
 
     override fun render(delta: Float) {
@@ -377,8 +505,40 @@ class StageScreen(
 
         super.render(delta)
 
-        if (!this.isLoading)
+        if (!this.isLoading) {
             this.gameWorld.render(delta)
+
+            // Spawn enemies from wave data
+            this.waveManager.update(delta)
+
+            // Step behavior trees (after physics so positions are current)
+            for (obj in this.gameObjects.toList()) {
+                if (obj.isAlive) {
+                    obj.shootCooldownRemaining = (obj.shootCooldownRemaining - delta).coerceAtLeast(0f)
+                    obj.behaviorTree?.step()
+                }
+            }
+
+            // Clean up dead entities (safe to destroyBody after world.step())
+            this.gameObjects.removeAll { obj ->
+                if (!obj.isAlive) {
+                    val deathPos = obj.getPosition().cpy().scl(PPM)
+                    when (obj) {
+                        is MachineEntity -> {
+                            this.gameWorld.world.destroyBody(obj.body)
+                            obj.machine.remove()
+                            spawnEffect("explode-npc", deathPos)
+                        }
+                        is EnemyTankEntity -> {
+                            this.gameWorld.world.destroyBody(obj.body)
+                            obj.tank.remove()
+                            spawnEffect("explode-npc", deathPos)
+                        }
+                    }
+                    true
+                } else false
+            }
+        }
     }
 
     override fun pause() {

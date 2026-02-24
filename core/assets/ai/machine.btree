@@ -51,7 +51,6 @@ subtree name:"turnAndShoot"
     sequence
         stop
         shootTarget
-        walkForward
 
 subtree name:"turnAndShootAndContinueForward"
     parallel

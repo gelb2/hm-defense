@@ -13,7 +13,7 @@ import fr.mesabloo.heavymachdefense.data.models.MachineModel
 import fr.mesabloo.heavymachdefense.managers.assets.StageAssetsManager
 import fr.mesabloo.heavymachdefense.managers.assets.stageAssetsManager
 
-class Machine(kind: MachineKind, level: Int) : Group() {
+class Machine(val kind: MachineKind, level: Int) : Group() {
     var physicsBody: Body? = null
 
     var hp: Int = 100
@@ -38,12 +38,7 @@ class Machine(kind: MachineKind, level: Int) : Group() {
 
         val body =
             Image(stageAssetsManager.unsafeRegion(StageAssetsManager.MACHINE_BODIES, "${kind.machineName}-$oLevel"))
-        val weapon1 =
-            Image(stageAssetsManager.unsafeRegion(StageAssetsManager.MACHINE_WEAPONS, "${kind.machineName}-$oLevel"))
-        val weapon2 = Image(
-            TextureRegion(stageAssetsManager.unsafeRegion(StageAssetsManager.MACHINE_WEAPONS, "${kind.machineName}-$oLevel")).also {
-                it.flip(false, true)
-            })
+        val weaponRegion = stageAssetsManager.safeRegion(StageAssetsManager.MACHINE_WEAPONS, "${kind.machineName}-$oLevel")
 
         this.width = body.width
         this.height = body.height
@@ -79,21 +74,26 @@ class Machine(kind: MachineKind, level: Int) : Group() {
             it.setPosition(0f, 0f)
         })
 
-        // Weapons (drawn on top of body)
-        this.addActor(weapon1.also {
-            it.setPosition(
-                body.width / 2f + model.leftWeaponOffset.first - it.width / 2f,
-                body.height / 2f + model.leftWeaponOffset.second - it.height / 2f
-            )
-            it.zIndex = 5000
-        })
-        this.addActor(weapon2.also {
-            it.setPosition(
-                body.width / 2f + model.rightWeaponOffset.first - it.width / 2f,
-                body.height / 2f + model.rightWeaponOffset.second - it.height / 2f
-            )
-            it.zIndex = 5000
-        })
+        // Weapons (drawn on top of body, skipped if no weapon region in atlas)
+        if (weaponRegion != null) {
+            val weapon1 = Image(weaponRegion)
+            val weapon2 = Image(TextureRegion(weaponRegion).also { it.flip(false, true) })
+
+            this.addActor(weapon1.also {
+                it.setPosition(
+                    body.width / 2f + model.leftWeaponOffset.first - it.width / 2f,
+                    body.height / 2f + model.leftWeaponOffset.second - it.height / 2f
+                )
+                it.zIndex = 5000
+            })
+            this.addActor(weapon2.also {
+                it.setPosition(
+                    body.width / 2f + model.rightWeaponOffset.first - it.width / 2f,
+                    body.height / 2f + model.rightWeaponOffset.second - it.height / 2f
+                )
+                it.zIndex = 5000
+            })
+        }
     }
 
     /**
@@ -108,11 +108,32 @@ class Machine(kind: MachineKind, level: Int) : Group() {
      * @param moveSpeed average forward speed in pixels/sec
      */
     fun startWalkingAnimation(moveSpeed: Float) {
-        val frames = this.feetFrames ?: return
-        val framesFlipped = this.feetFramesFlipped ?: return
-        val lFoot = this.leftFoot ?: return
-        val rFoot = this.rightFoot ?: return
         val pBody = this.physicsBody ?: return
+
+        // Machines without feet (e.g. tanker): smooth constant movement, no foot animation
+        if (this.feetFrames == null) {
+            this.addAction(object : Action() {
+                override fun act(delta: Float): Boolean {
+                    val machine = actor as Machine
+                    if (!machine.isAlive) {
+                        pBody.setLinearVelocity(0f, 0f)
+                        return true
+                    }
+                    if (!machine.walking) {
+                        pBody.setLinearVelocity(0f, 0f)
+                        return false
+                    }
+                    pBody.setLinearVelocity(0f, moveSpeed / PPM)
+                    return false
+                }
+            })
+            return
+        }
+
+        val frames = this.feetFrames!!
+        val framesFlipped = this.feetFramesFlipped!!
+        val lFoot = this.leftFoot!!
+        val rFoot = this.rightFoot!!
 
         lFoot.isVisible = true
         rFoot.isVisible = true

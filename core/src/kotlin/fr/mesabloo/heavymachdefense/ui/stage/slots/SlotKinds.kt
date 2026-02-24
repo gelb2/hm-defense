@@ -7,8 +7,8 @@ import com.badlogic.gdx.scenes.scene2d.Touchable
 import com.badlogic.gdx.scenes.scene2d.ui.Image
 import com.badlogic.gdx.scenes.scene2d.ui.Label
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable
+import fr.mesabloo.heavymachdefense.DEV
 import fr.mesabloo.heavymachdefense.data.*
-import fr.mesabloo.heavymachdefense.entities.buildMachineTemplate
 import fr.mesabloo.heavymachdefense.managers.FontManager
 import fr.mesabloo.heavymachdefense.managers.assets.StageAssetsManager
 import fr.mesabloo.heavymachdefense.managers.assets.stageAssetsManager
@@ -100,7 +100,7 @@ class MachineBuildSlot(
     private val cell: Actor
 
     init {
-        this.machine = buildMachineTemplate(this.slot.kind, this.level)
+        this.machine = createBodyPreview()
 
         this.addActor(Label(slot.kind.machineName, Label.LabelStyle().also {
             it.font = fontManager.bitmapFonts[FontManager.TREBUCHET_MS_BOLD_11_WHITE]
@@ -121,19 +121,27 @@ class MachineBuildSlot(
         this.updateSlot()
     }
 
+    private fun createBodyPreview(): Image {
+        val oLevel = this.level.toString().padStart(2, '0')
+        return Image(stageAssetsManager.unsafeRegion(
+            StageAssetsManager.MACHINE_BODIES, "${this.slot.kind.machineName}-$oLevel"
+        ))
+    }
+
     private fun updateSlot() {
         if (this.machine.hasParent()) {
             this.machine.remove()
-
-            this.machine = buildMachineTemplate(this.slot.kind, this.level)
         }
-
+        this.machine = createBodyPreview()
         this.addActor(this.machine)
 
-        this.cellCost = builds.machines[Pair(this.slot.kind, level)]?.cellCost ?: 9999
+        this.cellCost = if (DEV) 1 else builds.machines[Pair(this.slot.kind, level)]?.cellCost ?: 9999
 
+        // Scale to fit rifle-01 visual footprint (64w x 32h after 90° rotation)
+        val scale = minOf(1f, 64f / this.machine.height, 32f / this.machine.width)
+        this.machine.setSize(this.machine.width * scale, this.machine.height * scale)
         this.machine.rotation = 90f
-        this.machine.setPosition(80f - this.machine.width / 2f, 42f - this.machine.height / 2f)
+        this.machine.setPosition(32f + this.machine.height / 2f, 26f - this.machine.width / 2f)
         this.machine.touchable = Touchable.disabled
 
         (this.cell as Label).setText(this.cellCost.toString())

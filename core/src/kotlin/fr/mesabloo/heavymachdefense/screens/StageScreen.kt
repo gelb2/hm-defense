@@ -27,6 +27,7 @@ import fr.mesabloo.heavymachdefense.data.Specials
 import fr.mesabloo.heavymachdefense.listeners.stage.*
 import fr.mesabloo.heavymachdefense.managers.WaveManager
 import fr.mesabloo.heavymachdefense.managers.animationManager
+import fr.mesabloo.heavymachdefense.ifDev
 import fr.mesabloo.heavymachdefense.managers.assets.StageAssetsManager
 import fr.mesabloo.heavymachdefense.managers.assets.assetManager
 import fr.mesabloo.heavymachdefense.managers.assets.stageAssetsManager
@@ -217,10 +218,18 @@ class StageScreen(
             it.setPosition(22f, 692f - it.height)
         })
 
-        this.background.addActor(Group().also {
+        val slotsContent = Group().also {
             this.machineSlots = it
 
-            var currentY = SLOT_MENU_HEIGHT - 76f
+            ifDev {
+                this.save.buildSlots = MachineKind.values().map { MachineSlot(it) }.toMutableList()
+            }
+
+            val slotCount = this.save.buildSlots.size
+            val contentHeight = 76f + slotCount * 102f
+            it.setSize(SLOT_MENU_WIDTH, contentHeight)
+
+            var currentY = contentHeight - 76f
             for (slot in this.save.buildSlots) {
                 it.addActor(when (slot) {
                     is MachineSlot -> MachineBuildSlot(
@@ -255,10 +264,15 @@ class StageScreen(
                 currentY -= 102f
             }
 
+            it.alpha = 1f
+            it.touchable = Touchable.enabled
+        }
+        this.background.addActor(ScrollPane(slotsContent).also {
             it.setPosition(640f, 966f - SLOT_MENU_HEIGHT)
             it.setSize(SLOT_MENU_WIDTH, SLOT_MENU_HEIGHT)
-
-            it.alpha = 1f
+            it.setScrollingDisabled(true, false)
+            it.setOverscroll(false, false)
+            it.setFlickScroll(true)
             it.touchable = Touchable.enabled
         })
         this.background.addActor(Group().also {
@@ -426,9 +440,45 @@ class StageScreen(
             val targetPos = target.getPosition().cpy().scl(PPM)
             val shooterEntity = shooter as MachineEntity
             val damage = shooterEntity.machine.attackDamage
-            val bulletRegion = stageAssetsManager.unsafeRegion(StageAssetsManager.ALLY_BULLETS, "00")
+            val kind = shooterEntity.machine.kind
+
+            // Per-machine bullet sprite, speed, and hit effect
+            val (bulletRegion, bulletSpeed, hitEffect) = when (kind) {
+                MachineKind.RIFLE -> Triple(
+                    stageAssetsManager.unsafeRegion(StageAssetsManager.ALLY_BULLETS, "00"), 350f, "damage"
+                )
+                MachineKind.HMG -> Triple(
+                    stageAssetsManager.unsafeRegion(StageAssetsManager.ALLY_BULLETS, "04"), 400f, "damage-hmg"
+                )
+                MachineKind.MISSILE -> Triple(
+                    stageAssetsManager.unsafeRegion(StageAssetsManager.SHELL_BULLETS, "00"), 250f, "explode-01"
+                )
+                MachineKind.HEAVY_MISSILE -> Triple(
+                    stageAssetsManager.unsafeRegion(StageAssetsManager.SHELL_BULLETS, "01"), 200f, "explode-02"
+                )
+                MachineKind.ION -> Triple(
+                    stageAssetsManager.unsafeRegion(StageAssetsManager.ALLY_BULLETS, "06"), 450f, "explode-ion"
+                )
+                MachineKind.PLASMA -> Triple(
+                    stageAssetsManager.unsafeRegion(StageAssetsManager.ALLY_BULLETS, "10"), 300f, "explode-plasma"
+                )
+                MachineKind.SHOTGUN -> Triple(
+                    stageAssetsManager.unsafeRegion(StageAssetsManager.ALLY_BULLETS, "03"), 380f, "damage"
+                )
+                MachineKind.TANKER -> Triple(
+                    stageAssetsManager.unsafeRegion(StageAssetsManager.ALLY_BULLETS, "08"), 300f, "explode-01"
+                )
+            }
+
+            // Smoke trail for missile/shell type bullets
+            val smokeTrail = when (kind) {
+                MachineKind.MISSILE, MachineKind.HEAVY_MISSILE ->
+                    assetManager.get<TextureAtlas>(StageAssetsManager.EFFECTS).findRegions("smoke")
+                else -> null
+            }
+
             val bullet = Bullet(
-                bulletRegion, shooterPos, targetPos, 350f,
+                bulletRegion, shooterPos, targetPos, bulletSpeed,
                 damage,
                 { target.isAlive },
                 { hitPos ->
@@ -436,9 +486,10 @@ class StageScreen(
                         is EnemyTankEntity -> target.tank.hp -= damage
                         is BaseEntity -> target.hp -= damage
                     }
-                    spawnEffect("damage", hitPos)
+                    spawnEffect(hitEffect, hitPos)
                 },
-                {}
+                {},
+                trailRegions = smokeTrail
             )
             this.terrain.addActor(bullet)
         }
@@ -605,7 +656,13 @@ class StageScreen(
                         is MachineEntity -> {
                             this.gameWorld.world.destroyBody(obj.body)
                             obj.machine.remove()
-                            spawnEffect("explode-npc", deathPos)
+                            val deathEffect = when (obj.machine.kind) {
+                                MachineKind.MISSILE, MachineKind.HEAVY_MISSILE, MachineKind.TANKER -> "explode-02"
+                                MachineKind.ION -> "explode-ion"
+                                MachineKind.PLASMA -> "explode-plasma"
+                                else -> "explode-npc"
+                            }
+                            spawnEffect(deathEffect, deathPos)
                         }
                         is EnemyTankEntity -> {
                             this.gameWorld.world.destroyBody(obj.body)

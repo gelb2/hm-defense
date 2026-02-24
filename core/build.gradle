@@ -11,15 +11,21 @@ buildConfig {
 
         if (releaseType == "dev") {
             buildConfigField("boolean", "RELEASE", "false")
+            buildConfigField("boolean", "INHOUSE", "false")
+        } else if (releaseType == "inhouse") {
+            buildConfigField("boolean", "RELEASE", "false")
+            buildConfigField("boolean", "INHOUSE", "true")
         } else if (releaseType == "release") {
             buildConfigField("boolean", "RELEASE", "true")
+            buildConfigField("boolean", "INHOUSE", "false")
         } else {
-            throw new InvalidPropertiesFormatException("Expected either 'dev' or 'release' for property 'releaseType' but got '$releaseType'")
+            throw new InvalidPropertiesFormatException("Expected 'dev', 'inhouse', or 'release' for property 'releaseType' but got '$releaseType'")
         }
     } else {
         println("Defaulting to release type 'release'")
 
         buildConfigField("boolean", "RELEASE", "true")
+        buildConfigField("boolean", "INHOUSE", "false")
     }
 }
 

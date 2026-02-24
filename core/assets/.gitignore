@@ -1,3 +1,6 @@
 *.png
 *.jpg
 *.wav
+
+# debug UI assets (needed for dev/inhouse builds)
+!gfx/ui/debug/*.png

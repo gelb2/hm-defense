@@ -559,11 +559,11 @@ class StageScreen(
         return bestX.coerceIn(SPAWN_X_MIN + halfW, SPAWN_X_MAX - halfW)
     }
 
-    private fun spawnEffect(effectName: String, pixelPos: Vector2) {
+    private fun spawnEffect(effectName: String, pixelPos: Vector2, additive: Boolean = false) {
         val atlas = assetManager.get<TextureAtlas>(StageAssetsManager.EFFECTS)
         val regions = atlas.findRegions(effectName)
         if (regions.size == 0) return
-        val effect = ExplosionEffect(regions)
+        val effect = ExplosionEffect(regions, additive = additive)
         effect.setPosition(pixelPos.x - effect.width / 2f, pixelPos.y - effect.height / 2f)
         this.terrain.addActor(effect)
     }
@@ -672,7 +672,7 @@ class StageScreen(
                 for (target in targets) {
                     target.tank.hp -= damage
                 }
-                spawnEffect("explode-boss", centerPixel)
+                spawnEffect("explode-boss", centerPixel, additive = true)
                 for (j in 0 until 5) {
                     val offset = Vector2(
                         centerPixel.x + (-60..60).random(),

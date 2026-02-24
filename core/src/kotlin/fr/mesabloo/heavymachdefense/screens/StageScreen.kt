@@ -5,8 +5,11 @@ import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.ai.btree.utils.BehaviorTreeParser
 import com.badlogic.gdx.graphics.g2d.TextureAtlas
 import com.badlogic.gdx.math.Vector2
+import com.badlogic.gdx.math.Interpolation
 import com.badlogic.gdx.scenes.scene2d.Group
 import com.badlogic.gdx.scenes.scene2d.Touchable
+import com.badlogic.gdx.scenes.scene2d.actions.Actions
+import com.badlogic.gdx.scenes.scene2d.ui.Image
 import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane
 import com.badlogic.gdx.physics.box2d.BodyDef
 import com.badlogic.gdx.utils.Timer
@@ -568,6 +571,25 @@ class StageScreen(
         this.terrain.addActor(effect)
     }
 
+    private fun spawnPlaneFlyover(targetX: Float) {
+        val planeRegion = stageAssetsManager.get(StageAssetsManager.ALLY_PLANE)
+        val plane = Image(planeRegion)
+        val scale = 0.35f
+        plane.setSize(plane.width * scale, plane.height * scale)
+        plane.setOrigin(plane.width / 2f, plane.height / 2f)
+
+        val startY = -plane.height
+        plane.setPosition(targetX - plane.width / 2f, startY)
+
+        val endY = 2048f + plane.height
+        plane.addAction(Actions.sequence(
+            Actions.moveTo(plane.x, endY, 2.5f, Interpolation.linear),
+            Actions.removeActor()
+        ))
+
+        terrain.addActor(plane)
+    }
+
     // ======================== Special Attacks ========================
 
     private fun executeSpecialAttack(kind: SpecialKind) {
@@ -599,14 +621,17 @@ class StageScreen(
 
     private fun executeAirstrikeBomb(info: AirstrikeBombInfo) {
         val damage = info.unitDamage
+        val enemies = gameObjects.filterIsInstance<EnemyTankEntity>().filter { it.isAlive }
+        val flyoverX = if (enemies.isNotEmpty()) enemies.random().getPosition().x * PPM else 256f
+
         for (i in 0 until info.bombCount) {
             Timer.schedule(object : Timer.Task() {
                 override fun run() {
                     if (gameEnded) return
-                    val enemies = gameObjects.filterIsInstance<EnemyTankEntity>().filter { it.isAlive }
+                    val alive = gameObjects.filterIsInstance<EnemyTankEntity>().filter { it.isAlive }
                     val pos: Vector2
-                    if (enemies.isNotEmpty()) {
-                        val target = enemies.random()
+                    if (alive.isNotEmpty()) {
+                        val target = alive.random()
                         pos = target.getPosition().cpy().scl(PPM)
                         pos.x += (-20..20).random()
                         pos.y += (-20..20).random()
@@ -619,18 +644,28 @@ class StageScreen(
                 }
             }, i * 0.12f)
         }
+
+        Timer.schedule(object : Timer.Task() {
+            override fun run() {
+                if (gameEnded) return
+                spawnPlaneFlyover(flyoverX)
+            }
+        }, 2f)
     }
 
     private fun executeAirstrikeMissile(info: AirstrikeMissileInfo) {
         val damage = info.unitDamage
+        val enemies = gameObjects.filterIsInstance<EnemyTankEntity>().filter { it.isAlive }
+        val flyoverX = if (enemies.isNotEmpty()) enemies.random().getPosition().x * PPM else 256f
+
         for (i in 0 until info.bombCount) {
             Timer.schedule(object : Timer.Task() {
                 override fun run() {
                     if (gameEnded) return
-                    val enemies = gameObjects.filterIsInstance<EnemyTankEntity>().filter { it.isAlive }
+                    val alive = gameObjects.filterIsInstance<EnemyTankEntity>().filter { it.isAlive }
                     val pos: Vector2
-                    if (enemies.isNotEmpty()) {
-                        val target = enemies.random()
+                    if (alive.isNotEmpty()) {
+                        val target = alive.random()
                         pos = target.getPosition().cpy().scl(PPM)
                         pos.x += (-15..15).random()
                         pos.y += (-15..15).random()
@@ -643,6 +678,13 @@ class StageScreen(
                 }
             }, i * 0.15f)
         }
+
+        Timer.schedule(object : Timer.Task() {
+            override fun run() {
+                if (gameEnded) return
+                spawnPlaneFlyover(flyoverX)
+            }
+        }, 2f)
     }
 
     private fun executeAirstrikeNuke(info: AirstrikeNukeInfo) {
@@ -689,6 +731,13 @@ class StageScreen(
                 stageAssetsManager.sound(StageAssetsManager.SOUND_GROUND_EXPLOSION).play(effectsVolume)
             }
         }, 0.3f)
+
+        Timer.schedule(object : Timer.Task() {
+            override fun run() {
+                if (gameEnded) return
+                spawnPlaneFlyover(centerPixel.x)
+            }
+        }, 2f)
     }
 
     private fun executeAirstrikeEMP(info: AirStrikeEMPInfo) {
@@ -725,6 +774,13 @@ class StageScreen(
                 stageAssetsManager.randomSpecialImpactSound().play(effectsVolume)
             }
         }, 0.3f)
+
+        Timer.schedule(object : Timer.Task() {
+            override fun run() {
+                if (gameEnded) return
+                spawnPlaneFlyover(avgX * PPM)
+            }
+        }, 2f)
     }
 
     private fun executeCrossfireMissile(info: CrossfireMissileInfo) {

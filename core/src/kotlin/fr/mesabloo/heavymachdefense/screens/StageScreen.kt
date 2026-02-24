@@ -51,9 +51,12 @@ import fr.mesabloo.heavymachdefense.world.GameWorld
 import fr.mesabloo.heavymachdefense.world.UI_HEIGHT
 import fr.mesabloo.heavymachdefense.world.UI_WIDTH
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import ktx.actors.alpha
 import ktx.actors.setScrollFocus
+import ktx.preferences.flush
+import ktx.preferences.set
 import kotlin.math.pow
 import kotlin.properties.Delegates
 
@@ -395,7 +398,7 @@ class StageScreen(
             val levelWaves: LevelWaves = Json.decodeFromString(waveFile.readString())
             this.waveManager = WaveManager(levelWaves) { info -> spawnEnemyTank(info) }
         } else {
-            this.waveManager = WaveManager(LevelWaves(emptyList())) {}
+            this.waveManager = WaveManager(generateDefaultWaves(level)) { info -> spawnEnemyTank(info) }
         }
     }
 
@@ -710,6 +713,13 @@ class StageScreen(
             } else if (!enemyBaseEntity.isAlive && !gameEnded) {
                 gameEnded = true
                 gameEndTimer = 0f
+                // Unlock next stage if this is the furthest cleared
+                if (this.level > this.save.lastStageCompleted) {
+                    this.save.lastStageCompleted = this.level.coerceAtMost(79)
+                    Gdx.app.getPreferences(GameSave.PREFERENCES_PATH).flush {
+                        this[this@StageScreen.saveIndex.toString()] = Json.encodeToString(this@StageScreen.save)
+                    }
+                }
                 showGameResult(true)
             }
         }

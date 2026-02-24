@@ -7,6 +7,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable
 import com.badlogic.gdx.utils.Align
+import fr.mesabloo.heavymachdefense.DEV
 import fr.mesabloo.heavymachdefense.data.getBackgroundForLevel
 import fr.mesabloo.heavymachdefense.managers.FontManager
 import fr.mesabloo.heavymachdefense.managers.assets.LevelSelectionAssetsManager
@@ -35,7 +36,7 @@ class StageList(private val last: Int) : ScrollPane(Table()) {
                 .forEachIndexed { index, actor ->
                     (actor as Table).background = TextureRegionDrawable(
                         if (index == value) selectedForeground
-                        else if (index < last) normalBackground
+                        else if (DEV || index < last) normalBackground
                         else disabledBackground
                     )
                 }
@@ -58,7 +59,7 @@ class StageList(private val last: Int) : ScrollPane(Table()) {
     private fun createItem(index: Int, last: Int): Table {
         val stageNumber = Label("Stage ${index + 1}", Label.LabelStyle().also {
             it.font = fontManager.bitmapFonts[FontManager.TREBUCHET_MS_BOLD_28_BLUE]
-            it.fontColor = if (index < last) color(0.478f, 1.000f, 0.933f) else color(0f, 0f, 0f)
+            it.fontColor = if (DEV || index < last) color(0.478f, 1.000f, 0.933f) else color(0f, 0f, 0f)
         })
         stageNumber.setAlignment(Align.center)
         stageNumber.touchable = Touchable.disabled
@@ -81,7 +82,7 @@ class StageList(private val last: Int) : ScrollPane(Table()) {
 
         table.background = TextureRegionDrawable(
             if (index == this.last - 1) selectedForeground
-            else if (index < last) normalBackground
+            else if (DEV || index < last) normalBackground
             else disabledBackground
         )
 

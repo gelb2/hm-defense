@@ -2,12 +2,21 @@ package fr.mesabloo.heavymachdefense.screens
 
 import aurelienribon.tweenengine.TweenManager
 import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.ai.btree.utils.BehaviorTreeParser
+import com.badlogic.gdx.graphics.g2d.TextureAtlas
+import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.scenes.scene2d.Group
 import com.badlogic.gdx.scenes.scene2d.Touchable
 import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane
 import com.badlogic.gdx.physics.box2d.BodyDef
+import com.badlogic.gdx.utils.Timer
 import fr.mesabloo.heavymachdefense.MainGame
 import fr.mesabloo.heavymachdefense.PPM
+import fr.mesabloo.heavymachdefense.ai.BaseEntity
+import fr.mesabloo.heavymachdefense.ai.EnemyTankEntity
+import fr.mesabloo.heavymachdefense.ai.GameObject
+import fr.mesabloo.heavymachdefense.ai.MachineEntity
+import fr.mesabloo.heavymachdefense.ai.Team
 import fr.mesabloo.heavymachdefense.data.*
 import fr.mesabloo.heavymachdefense.entities.buildMachineTemplate
 import fr.mesabloo.heavymachdefense.entities.createBases
@@ -16,14 +25,22 @@ import ktx.box2d.body
 import ktx.box2d.box
 import fr.mesabloo.heavymachdefense.data.Specials
 import fr.mesabloo.heavymachdefense.listeners.stage.*
+import fr.mesabloo.heavymachdefense.managers.WaveManager
 import fr.mesabloo.heavymachdefense.managers.animationManager
 import fr.mesabloo.heavymachdefense.managers.assets.StageAssetsManager
+import fr.mesabloo.heavymachdefense.managers.assets.assetManager
 import fr.mesabloo.heavymachdefense.managers.assets.stageAssetsManager
 import fr.mesabloo.heavymachdefense.timers.cellMiningTimer
 import fr.mesabloo.heavymachdefense.ui.stage.*
 import fr.mesabloo.heavymachdefense.ui.stage.buttons.*
 import fr.mesabloo.heavymachdefense.ui.stage.dialog.SystemMenu
+import fr.mesabloo.heavymachdefense.ui.stage.EnemyTank
+import fr.mesabloo.heavymachdefense.managers.assets.levelSelectionAssetsManager
+import fr.mesabloo.heavymachdefense.managers.assets.buttonAssetsManager
 import fr.mesabloo.heavymachdefense.ui.stage.game.AllyBase
+import fr.mesabloo.heavymachdefense.ui.stage.game.Bullet
+import fr.mesabloo.heavymachdefense.ui.stage.game.ExplosionEffect
+import fr.mesabloo.heavymachdefense.ui.stage.game.GameResultOverlay
 import fr.mesabloo.heavymachdefense.ui.stage.slots.MachineBuildSlot
 import fr.mesabloo.heavymachdefense.ui.stage.slots.SpecialBuildSlot
 import fr.mesabloo.heavymachdefense.ui.stage.slots.TurretBuildSlot
@@ -50,11 +67,28 @@ class StageScreen(
         const val SLOT_MENU_WIDTH = 128f
         const val SLOT_MENU_HEIGHT = 710f
         const val MACHINE_SPEED = 12.5f // pixels per second
+        const val ENEMY_SPEED = 10f // pixels per second
+        const val SPAWN_X_MIN = 48f   // terrain is 512px; leave margin for unit half-width
+        const val SPAWN_X_MAX = 464f
+        const val SPAWN_Y_PROXIMITY = 200f // only check entities near the spawn Y
     }
 
     private lateinit var buildQueue: BuildQueue
     private lateinit var allyBase: AllyBase
     private lateinit var gameWorld: GameWorld
+    private lateinit var waveManager: WaveManager
+
+    private lateinit var allyBaseEntity: BaseEntity
+    private lateinit var enemyBaseEntity: BaseEntity
+
+    private var gameEnded = false
+    private var gameEndTimer = 0f
+    private var gameResultOverlay: GameResultOverlay? = null
+
+    private val gameObjects = mutableListOf<GameObject>()
+
+    private val btreeSource by lazy { Gdx.files.internal("ai/machine.btree").readString() }
+    private val btreeParser = BehaviorTreeParser<GameObject>(BehaviorTreeParser.DEBUG_NONE)
 
     private val upgrades: Upgrades = Json.decodeFromString(Gdx.files.internal("data/upgrades.json").readString())
     private val builds: Builds = Json {
@@ -67,8 +101,8 @@ class StageScreen(
     private lateinit var title: Title
     private lateinit var terrain: Terrain
 
-    private var playerLife: Long = 100L
-    private var enemyLife: Long = 100L
+    private var playerLife: Long = 500L
+    private var enemyLife: Long = 500L
 
     private val menuTweenManager = TweenManager()
 
@@ -318,16 +352,44 @@ class StageScreen(
         this.gameWorld = GameWorld(this.terrain)
 
         createTerrainBody(this.gameWorld)
-        val (allyBase, _) = createBases(this.gameWorld, this.upgrades, this::save)
-        this.allyBase = allyBase
+        val basesResult = createBases(this.gameWorld, this.upgrades, this::save)
+        this.allyBase = basesResult.allyBase
+
+        // Register bases as targetable game objects
+        this.allyBaseEntity = BaseEntity(basesResult.allyBase, basesResult.allyBody, this.gameObjects, Team.ALLY, 500, 500)
+        this.enemyBaseEntity = BaseEntity(basesResult.enemyBase, basesResult.enemyBody, this.gameObjects, Team.ENEMY, 500, 500)
+        this.gameObjects.add(allyBaseEntity)
+        this.gameObjects.add(enemyBaseEntity)
 
         this.background.addActor(Radar(scrollpane).also {
             it.setPosition(22f, 698f)
         })
+
+        // Load wave data for this level
+        val wavePath = "data/waves/level-${level.toString().padStart(2, '0')}.json"
+        val waveFile = Gdx.files.internal(wavePath)
+        if (waveFile.exists()) {
+            val levelWaves: LevelWaves = Json.decodeFromString(waveFile.readString())
+            this.waveManager = WaveManager(levelWaves) { info -> spawnEnemyTank(info) }
+        } else {
+            this.waveManager = WaveManager(LevelWaves(emptyList())) {}
+        }
     }
 
     private fun spawnMachine(kind: MachineKind, level: Int) {
+        if (gameEnded) return
         val machine = buildMachineTemplate(kind, level)
+
+        // Apply combat stats from build-info
+        val stats = this.builds.machines[Pair(kind, level)]
+        if (stats != null) {
+            machine.hp = stats.hp
+            machine.maxHp = stats.hp
+            machine.attackDamage = stats.attack
+            machine.attackSpeed = stats.attackSpeed
+            machine.attackRange = stats.range
+            machine.detectionRange = stats.detectionRange
+        }
 
         // Face upward (only for terrain machines, not UI slots)
         machine.setOrigin(machine.width / 2f, machine.height / 2f)
@@ -345,15 +407,149 @@ class StageScreen(
                 isSensor = false
             }
             userData = machine
+            val machineSpawnY = 160f + machine.height / 2f
             position.set(
-                (256f + machine.width / 2f) / PPM,
-                (160f + machine.height / 2f) / PPM
+                findNonOverlappingSpawnX(machine.width, Team.ALLY, machineSpawnY) / PPM,
+                machineSpawnY / PPM
             )
         }
 
         // Walking animation controls body velocity (step-based movement)
         machine.physicsBody = body
         machine.startWalkingAnimation(MACHINE_SPEED)
+
+        // Register AI entity
+        val entity = MachineEntity(machine, body, this.gameObjects, MACHINE_SPEED)
+        entity.behaviorTree = this.btreeParser.parse(this.btreeSource, entity)
+        entity.onShoot = { shooter, target ->
+            val shooterPos = shooter.getPosition().cpy().scl(PPM)
+            val targetPos = target.getPosition().cpy().scl(PPM)
+            val shooterEntity = shooter as MachineEntity
+            val damage = shooterEntity.machine.attackDamage
+            val bulletRegion = stageAssetsManager.unsafeRegion(StageAssetsManager.ALLY_BULLETS, "00")
+            val bullet = Bullet(
+                bulletRegion, shooterPos, targetPos, 350f,
+                damage,
+                { target.isAlive },
+                { hitPos ->
+                    when (target) {
+                        is EnemyTankEntity -> target.tank.hp -= damage
+                        is BaseEntity -> target.hp -= damage
+                    }
+                    spawnEffect("damage", hitPos)
+                },
+                {}
+            )
+            this.terrain.addActor(bullet)
+        }
+        this.gameObjects.add(entity)
+    }
+
+    /**
+     * Find a spawn X (in pixels) that avoids overlapping with existing entities of the given team.
+     * Only considers entities near the given [spawnY] (in pixels) to avoid false positives from
+     * entities that have already walked far away.
+     */
+    private fun findNonOverlappingSpawnX(unitWidth: Float, team: Team, spawnY: Float): Float {
+        val halfW = unitWidth / 2f
+        val spawnYWorld = spawnY / PPM
+
+        // Only consider same-team entities near the spawn Y
+        val occupiedXs = gameObjects
+            .filter { obj ->
+                obj.isAlive && obj.team == team && obj !is BaseEntity &&
+                    kotlin.math.abs(obj.getPosition().y - spawnYWorld) < SPAWN_Y_PROXIMITY / PPM
+            }
+            .map { it.getPosition().x * PPM }
+
+        if (occupiedXs.isEmpty()) {
+            return SPAWN_X_MIN + Math.random().toFloat() * (SPAWN_X_MAX - SPAWN_X_MIN)
+        }
+
+        // Try several random candidates and pick the one with the most clearance
+        var bestX = SPAWN_X_MIN + Math.random().toFloat() * (SPAWN_X_MAX - SPAWN_X_MIN)
+        var bestMinDist = 0f
+
+        for (i in 0 until 20) {
+            val candidateX = SPAWN_X_MIN + Math.random().toFloat() * (SPAWN_X_MAX - SPAWN_X_MIN)
+            val minDist = occupiedXs.minOf { kotlin.math.abs(it - candidateX) }
+            if (minDist > bestMinDist) {
+                bestMinDist = minDist
+                bestX = candidateX
+            }
+            if (minDist >= unitWidth) break // no overlap
+        }
+
+        return bestX.coerceIn(SPAWN_X_MIN + halfW, SPAWN_X_MAX - halfW)
+    }
+
+    private fun spawnEffect(effectName: String, pixelPos: Vector2) {
+        val atlas = assetManager.get<TextureAtlas>(StageAssetsManager.EFFECTS)
+        val regions = atlas.findRegions(effectName)
+        if (regions.size == 0) return
+        val effect = ExplosionEffect(regions)
+        effect.setPosition(pixelPos.x - effect.width / 2f, pixelPos.y - effect.height / 2f)
+        this.terrain.addActor(effect)
+    }
+
+    private fun spawnEnemyTank(info: EnemySpawnInfo) {
+        if (gameEnded) return
+        val tank = EnemyTank(info.tankType)
+        tank.hp = info.hp
+        tank.maxHp = info.hp
+        tank.attackDamage = info.attack
+        tank.attackSpeed = info.attackSpeed
+        tank.attackRange = info.range
+        tank.detectionRange = info.detectionRange
+
+        tank.setOrigin(tank.width / 2f, tank.height / 2f)
+        tank.rotation = -90f // face downward
+
+        val tankSpawnY = 1900f + tank.height / 2f
+        val spawnX = findNonOverlappingSpawnX(tank.width, Team.ENEMY, tankSpawnY) / PPM
+        val spawnY = tankSpawnY / PPM
+
+        val body = this.gameWorld.world.body {
+            type = BodyDef.BodyType.KinematicBody
+            box(
+                width = tank.width / PPM,
+                height = tank.height / PPM
+            ) {
+                density = 10f
+                restitution = 0f
+                friction = 1f
+                isSensor = false
+            }
+            userData = tank
+            position.set(spawnX, spawnY)
+        }
+
+        tank.physicsBody = body
+
+        val entity = EnemyTankEntity(tank, body, this.gameObjects, info.speed)
+        entity.behaviorTree = this.btreeParser.parse(this.btreeSource, entity)
+        entity.onShoot = { shooter, target ->
+            val shooterPos = shooter.getPosition().cpy().scl(PPM)
+            val targetPos = target.getPosition().cpy().scl(PPM)
+            val shooterEntity = shooter as EnemyTankEntity
+            val damage = shooterEntity.tank.attackDamage
+            val bulletRegion = stageAssetsManager.unsafeRegion(StageAssetsManager.ENEMY_BULLETS, "00")
+            val bullet = Bullet(
+                bulletRegion, shooterPos, targetPos, 300f,
+                damage,
+                { target.isAlive },
+                { hitPos ->
+                    when (target) {
+                        is MachineEntity -> target.machine.hp -= damage
+                        is BaseEntity -> target.hp -= damage
+                    }
+                    spawnEffect("damage", hitPos)
+                },
+                {}
+            )
+            this.terrain.addActor(bullet)
+        }
+        this.gameObjects.add(entity)
     }
 
     override fun render(delta: Float) {
@@ -377,8 +573,104 @@ class StageScreen(
 
         super.render(delta)
 
-        if (!this.isLoading)
+        if (!this.isLoading) {
+            // Game end countdown
+            if (gameEnded) {
+                gameEndTimer += delta
+                if (gameEndTimer >= 3f) {
+                    returnToStageSelect()
+                }
+                // Still render but skip gameplay updates
+                return
+            }
+
             this.gameWorld.render(delta)
+
+            // Spawn enemies from wave data
+            this.waveManager.update(delta)
+
+            // Step behavior trees (after physics so positions are current)
+            for (obj in this.gameObjects.toList()) {
+                if (obj.isAlive) {
+                    obj.shootCooldownRemaining = (obj.shootCooldownRemaining - delta).coerceAtLeast(0f)
+                    obj.behaviorTree?.step()
+                }
+            }
+
+            // Clean up dead entities (safe to destroyBody after world.step())
+            this.gameObjects.removeAll { obj ->
+                if (!obj.isAlive) {
+                    val deathPos = obj.getPosition().cpy().scl(PPM)
+                    when (obj) {
+                        is MachineEntity -> {
+                            this.gameWorld.world.destroyBody(obj.body)
+                            obj.machine.remove()
+                            spawnEffect("explode-npc", deathPos)
+                        }
+                        is EnemyTankEntity -> {
+                            this.gameWorld.world.destroyBody(obj.body)
+                            obj.tank.remove()
+                            spawnEffect("explode-npc", deathPos)
+                        }
+                    }
+                    true
+                } else false
+            }
+
+            // Sync HP bars with base entity HP
+            playerLife = allyBaseEntity.hp.toLong().coerceAtLeast(0L)
+            enemyLife = enemyBaseEntity.hp.toLong().coerceAtLeast(0L)
+
+            // Check game over / victory
+            if (!allyBaseEntity.isAlive && !gameEnded) {
+                gameEnded = true
+                gameEndTimer = 0f
+                showGameResult(false)
+            } else if (!enemyBaseEntity.isAlive && !gameEnded) {
+                gameEnded = true
+                gameEndTimer = 0f
+                showGameResult(true)
+            }
+        }
+    }
+
+    private fun showGameResult(isVictory: Boolean) {
+        val overlay = GameResultOverlay(isVictory)
+        this.gameResultOverlay = overlay
+        // Add to the UI foreground so it draws above everything
+        this.background.addActor(overlay)
+        overlay.zIndex = Int.MAX_VALUE
+    }
+
+    private fun returnToStageSelect() {
+        if (this.isLoading) return
+        gameEnded = false // prevent re-entry
+
+        levelSelectionAssetsManager.preload()
+        buttonAssetsManager.preload()
+
+        this.addLoadingOverlay({
+            if (!assetManager.isFinished)
+                assetManager.update()
+            levelSelectionAssetsManager.isFullyLoaded() && buttonAssetsManager.isFullyLoaded()
+        }) {
+            this@StageScreen.background.children.forEach { it.remove() }
+
+            val stageSelect = StageSelectionScreen(
+                this@StageScreen.game,
+                this@StageScreen.save,
+                this@StageScreen.saveIndex,
+                true
+            )
+            (this.changeScreen(stageSelect) as AbstractScreen?)
+                ?.addLoadingOverlayEnd()
+
+            Timer.schedule(object : Timer.Task() {
+                override fun run() {
+                    this@addLoadingOverlay.removeScreen<StageScreen>()?.dispose()
+                }
+            }, 0.050f)
+        }
     }
 
     override fun pause() {
@@ -396,6 +688,7 @@ class StageScreen(
     override fun dispose() {
         super.dispose()
 
+        this.gameResultOverlay?.dispose()
         this.gameWorld.dispose()
 
         animationManager.dispose()

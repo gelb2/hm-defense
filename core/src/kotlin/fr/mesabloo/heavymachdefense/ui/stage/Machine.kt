@@ -16,6 +16,16 @@ import fr.mesabloo.heavymachdefense.managers.assets.stageAssetsManager
 class Machine(kind: MachineKind, level: Int) : Group() {
     var physicsBody: Body? = null
 
+    var hp: Int = 100
+    var maxHp: Int = 100
+    var attackDamage: Int = 10
+    var attackSpeed: Float = 1.0f
+    var attackRange: Float = 120f
+    var detectionRange: Float = 180f
+
+    val isAlive: Boolean get() = hp > 0
+    var walking: Boolean = true
+
     private var leftFoot: Image? = null
     private var rightFoot: Image? = null
     private var feetFrames: List<TextureRegion>? = null
@@ -31,7 +41,7 @@ class Machine(kind: MachineKind, level: Int) : Group() {
         val weapon1 =
             Image(stageAssetsManager.unsafeRegion(StageAssetsManager.MACHINE_WEAPONS, "${kind.machineName}-$oLevel"))
         val weapon2 = Image(
-            stageAssetsManager.unsafeRegion(StageAssetsManager.MACHINE_WEAPONS, "${kind.machineName}-$oLevel").also {
+            TextureRegion(stageAssetsManager.unsafeRegion(StageAssetsManager.MACHINE_WEAPONS, "${kind.machineName}-$oLevel")).also {
                 it.flip(false, true)
             })
 
@@ -119,6 +129,18 @@ class Machine(kind: MachineKind, level: Int) : Group() {
             private val swayAmount = 2.5f
 
             override fun act(delta: Float): Boolean {
+                val machine = actor as Machine
+                if (!machine.isAlive) {
+                    pBody.setLinearVelocity(0f, 0f)
+                    lFoot.isVisible = false
+                    rFoot.isVisible = false
+                    return true // remove action on death
+                }
+                if (!machine.walking) {
+                    pBody.setLinearVelocity(0f, 0f)
+                    return false
+                }
+
                 elapsed += delta
                 val cycleTime = elapsed % fullCycle
 

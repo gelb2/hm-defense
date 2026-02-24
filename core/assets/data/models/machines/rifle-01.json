@@ -1,1 +1,1 @@
-{"body":{"size":[32,32]},"weapons":{"left":{"size":[32,16],"offset":[8,16]},"right":{"size":[32,16],"offset":[8,-16]}},"feet":[]}
+{"body":{"size":[32,32]},"weapons":{"left":{"size":[32,16],"offset":[8,16]},"right":{"size":[32,16],"offset":[8,-16]}},"feet":{"regions":["1","2","3"],"offset":[-4,-12]}}

@@ -330,18 +330,10 @@ class StageScreen(
     private fun spawnMachine(kind: MachineKind, level: Int) {
         val machine = buildMachineTemplate(kind, level)
 
-        // Face upward + walking wobble (only for terrain machines, not UI slots)
+        // Face upward (only for terrain machines, not UI slots)
         machine.setOrigin(machine.width / 2f, machine.height / 2f)
         machine.rotation = 90f
-        machine.addAction(object : com.badlogic.gdx.scenes.scene2d.Action() {
-            private var elapsed = 0f
-            override fun act(delta: Float): Boolean {
-                elapsed += delta
-                actor.x += com.badlogic.gdx.math.MathUtils.sin(elapsed * 6f) * 1.5f
-                actor.y += com.badlogic.gdx.math.MathUtils.sin(elapsed * 12f).coerceAtLeast(0f) * 1.2f
-                return false
-            }
-        })
+        machine.startWalkingAnimation()
 
         val body = this.gameWorld.world.body {
             type = BodyDef.BodyType.KinematicBody

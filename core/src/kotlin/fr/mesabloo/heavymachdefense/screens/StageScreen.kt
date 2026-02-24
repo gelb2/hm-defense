@@ -495,7 +495,10 @@ class StageScreen(
                 { target.isAlive },
                 { hitPos ->
                     when (target) {
-                        is EnemyTankEntity -> target.tank.hp -= damage
+                        is EnemyTankEntity -> {
+                            target.tank.hp -= damage
+                            stageAssetsManager.randomBodyHitSound().play(this.effectsVolume)
+                        }
                         is BaseEntity -> target.hp -= damage
                     }
                     spawnEffect(hitEffect, hitPos)
@@ -597,6 +600,10 @@ class StageScreen(
             val shooterEntity = shooter as EnemyTankEntity
             val damage = shooterEntity.tank.attackDamage
             val bulletRegion = stageAssetsManager.unsafeRegion(StageAssetsManager.ENEMY_BULLETS, "00")
+
+            // Enemy tank fire sound
+            stageAssetsManager.sound(StageAssetsManager.SOUND_ENEMY_FIRE).play(this.effectsVolume)
+
             val bullet = Bullet(
                 bulletRegion, shooterPos, targetPos, 300f,
                 damage,
@@ -678,11 +685,13 @@ class StageScreen(
                                 else -> "explode-npc"
                             }
                             spawnEffect(deathEffect, deathPos)
+                            stageAssetsManager.sound(StageAssetsManager.SOUND_MACH_EXPLOSION).play(this.effectsVolume)
                         }
                         is EnemyTankEntity -> {
                             this.gameWorld.world.destroyBody(obj.body)
                             obj.tank.remove()
                             spawnEffect("explode-npc", deathPos)
+                            stageAssetsManager.sound(StageAssetsManager.SOUND_GROUND_EXPLOSION).play(this.effectsVolume)
                         }
                     }
                     true

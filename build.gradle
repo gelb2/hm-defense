@@ -29,7 +29,7 @@ allprojects {
         gdxVersion = '1.13.1'
         ktxVersion = '1.13.1-rc1'
         tweenVersion = '6.3.3'
-        nativeDialogVersion = '1.3.0'
+        aiVersion = '1.8.2'
     }
 
     tasks.withType(Jar).configureEach {
@@ -55,8 +55,6 @@ project(":desktop") {
         api "com.badlogicgames.gdx:gdx-backend-lwjgl3:$gdxVersion"
         api "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop"
         api "com.badlogicgames.gdx:gdx-box2d-platform:$gdxVersion:natives-desktop"
-
-        api "de.tomgrill.gdxdialogs:gdx-dialogs-desktop:$nativeDialogVersion"
     }
 }
 
@@ -84,8 +82,8 @@ project(":core") {
         // Universal Tween Engine: simplify animations
         api "org.mini2Dx:universal-tween-engine:$tweenVersion"
 
-        // Native dialog boxes
-        api "de.tomgrill.gdxdialogs:gdx-dialogs-core:$nativeDialogVersion"
+        // LibGDX AI: behavior trees, steering behaviors
+        api "com.badlogicgames.gdx:gdx-ai:$aiVersion"
 
         // JSON (de)serialization
         implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3'

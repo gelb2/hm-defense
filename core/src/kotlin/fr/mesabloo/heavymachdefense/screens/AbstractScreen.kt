@@ -7,14 +7,19 @@ import aurelienribon.tweenengine.TweenManager
 import aurelienribon.tweenengine.equations.Quart
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.InputMultiplexer
+import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.scenes.scene2d.Actor
 import com.badlogic.gdx.scenes.scene2d.Group
 import com.badlogic.gdx.scenes.scene2d.Touchable
+import com.badlogic.gdx.scenes.scene2d.ui.Label
 import fr.mesabloo.heavymachdefense.MainGame
+import fr.mesabloo.heavymachdefense.DEV
+import fr.mesabloo.heavymachdefense.INHOUSE
 import fr.mesabloo.heavymachdefense.ifDebug
 import fr.mesabloo.heavymachdefense.tweens.ActorAccessor
 import fr.mesabloo.heavymachdefense.tweens.ActorAccessor.Companion.POSITION
 import fr.mesabloo.heavymachdefense.tweens.ActorAccessor.Companion.SCALE
+import fr.mesabloo.heavymachdefense.managers.assets.debugAssetsManager
 import fr.mesabloo.heavymachdefense.ui.debug.DebugInfo
 import fr.mesabloo.heavymachdefense.ui.loading.*
 import fr.mesabloo.heavymachdefense.world.UIWorld
@@ -41,6 +46,17 @@ abstract class AbstractScreen(val game: MainGame, isLoading: Boolean = false) : 
                 it.setPosition(0f, UI_HEIGHT - it.prefHeight)
                 it.touchable = Touchable.disabled
             })
+
+            val buildModeText = if (DEV) "devMode" else if (INHOUSE) "inhouseMode" else null
+            if (buildModeText != null) {
+                this.foreground.addActor(Label(buildModeText, Label.LabelStyle().also {
+                    it.font = debugAssetsManager.font
+                    it.fontColor = Color.YELLOW
+                }).also {
+                    it.setPosition(UI_WIDTH - it.prefWidth - 5f, 5f)
+                    it.touchable = Touchable.disabled
+                })
+            }
         }
     }
 

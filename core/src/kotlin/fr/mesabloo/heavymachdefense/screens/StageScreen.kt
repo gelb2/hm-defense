@@ -593,9 +593,9 @@ class StageScreen(
         val normX = dirX / dirLen
         val normY = dirY / dirLen
 
-        // Rotate nose toward target (sprite faces up by default)
+        // Rotate nose toward target (sprite faces right by default)
         val flightAngle = MathUtils.atan2(dirY, dirX) * MathUtils.radiansToDegrees
-        plane.rotation = flightAngle - 90f
+        plane.rotation = flightAngle
 
         // End: continue same direction until well above terrain
         val exitY = 2048f + plane.height * 2
@@ -605,7 +605,7 @@ class StageScreen(
         plane.setPosition(startX - plane.width / 2f, startY)
 
         plane.addAction(Actions.sequence(
-            Actions.moveTo(endX - plane.width / 2f, exitY, 2.5f, Interpolation.linear),
+            Actions.moveTo(endX - plane.width / 2f, exitY, 2.5f, Interpolation.pow3In),
             Actions.removeActor()
         ))
 
@@ -680,7 +680,7 @@ class StageScreen(
                 if (gameEnded) return
                 spawnPlaneFlyover(flyoverX, flyoverY)
             }
-        }, 1f)
+        }, 0.25f)
     }
 
     private fun executeAirstrikeMissile(info: AirstrikeMissileInfo) {
@@ -722,7 +722,7 @@ class StageScreen(
                 if (gameEnded) return
                 spawnPlaneFlyover(flyoverX, flyoverY)
             }
-        }, 1f)
+        }, 0.25f)
     }
 
     private fun executeAirstrikeNuke(info: AirstrikeNukeInfo) {
@@ -775,7 +775,7 @@ class StageScreen(
                 if (gameEnded) return
                 spawnPlaneFlyover(centerPixel.x, centerPixel.y)
             }
-        }, 1f)
+        }, 0.25f)
     }
 
     private fun executeAirstrikeEMP(info: AirStrikeEMPInfo) {
@@ -818,7 +818,7 @@ class StageScreen(
                 if (gameEnded) return
                 spawnPlaneFlyover(avgX * PPM, avgY * PPM)
             }
-        }, 1f)
+        }, 0.25f)
     }
 
     private fun executeCrossfireMissile(info: CrossfireMissileInfo) {

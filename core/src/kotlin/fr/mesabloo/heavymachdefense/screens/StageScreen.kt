@@ -6,6 +6,7 @@ import com.badlogic.gdx.ai.btree.utils.BehaviorTreeParser
 import com.badlogic.gdx.graphics.g2d.TextureAtlas
 import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.math.Interpolation
+import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.scenes.scene2d.Group
 import com.badlogic.gdx.scenes.scene2d.Touchable
 import com.badlogic.gdx.scenes.scene2d.actions.Actions
@@ -571,19 +572,40 @@ class StageScreen(
         this.terrain.addActor(effect)
     }
 
-    private fun spawnPlaneFlyover(targetX: Float) {
+    private fun spawnPlaneFlyover(targetX: Float, targetY: Float) {
         val planeRegion = stageAssetsManager.get(StageAssetsManager.ALLY_PLANE)
         val plane = Image(planeRegion)
-        val scale = 0.35f
+
+        // ~1/4 of terrain width (512/4=128), plane.png=256 → scale 0.5
+        val scale = 0.5f
         plane.setSize(plane.width * scale, plane.height * scale)
         plane.setOrigin(plane.width / 2f, plane.height / 2f)
 
+        // Start below screen with slight X offset for diagonal approach
+        val offsetX = (-80..80).random().toFloat()
+        val startX = targetX + offsetX
         val startY = -plane.height
-        plane.setPosition(targetX - plane.width / 2f, startY)
 
-        val endY = 2048f + plane.height
+        // Flight direction: toward target, always upward
+        val dirX = targetX - startX
+        val dirY = (targetY - startY).coerceAtLeast(1f)
+        val dirLen = Vector2(dirX, dirY).len()
+        val normX = dirX / dirLen
+        val normY = dirY / dirLen
+
+        // Rotate nose toward target (sprite faces up by default)
+        val flightAngle = MathUtils.atan2(dirY, dirX) * MathUtils.radiansToDegrees
+        plane.rotation = flightAngle - 90f
+
+        // End: continue same direction until well above terrain
+        val exitY = 2048f + plane.height * 2
+        val tToExit = (exitY - startY) / normY
+        val endX = startX + normX * tToExit
+
+        plane.setPosition(startX - plane.width / 2f, startY)
+
         plane.addAction(Actions.sequence(
-            Actions.moveTo(plane.x, endY, 2.5f, Interpolation.linear),
+            Actions.moveTo(endX - plane.width / 2f, exitY, 2.5f, Interpolation.linear),
             Actions.removeActor()
         ))
 
@@ -622,7 +644,15 @@ class StageScreen(
     private fun executeAirstrikeBomb(info: AirstrikeBombInfo) {
         val damage = info.unitDamage
         val enemies = gameObjects.filterIsInstance<EnemyTankEntity>().filter { it.isAlive }
-        val flyoverX = if (enemies.isNotEmpty()) enemies.random().getPosition().x * PPM else 256f
+        val flyoverX: Float
+        val flyoverY: Float
+        if (enemies.isNotEmpty()) {
+            val ref = enemies.random()
+            flyoverX = ref.getPosition().x * PPM
+            flyoverY = ref.getPosition().y * PPM
+        } else {
+            flyoverX = 256f; flyoverY = 1000f
+        }
 
         for (i in 0 until info.bombCount) {
             Timer.schedule(object : Timer.Task() {
@@ -648,15 +678,23 @@ class StageScreen(
         Timer.schedule(object : Timer.Task() {
             override fun run() {
                 if (gameEnded) return
-                spawnPlaneFlyover(flyoverX)
+                spawnPlaneFlyover(flyoverX, flyoverY)
             }
-        }, 2f)
+        }, 1f)
     }
 
     private fun executeAirstrikeMissile(info: AirstrikeMissileInfo) {
         val damage = info.unitDamage
         val enemies = gameObjects.filterIsInstance<EnemyTankEntity>().filter { it.isAlive }
-        val flyoverX = if (enemies.isNotEmpty()) enemies.random().getPosition().x * PPM else 256f
+        val flyoverX: Float
+        val flyoverY: Float
+        if (enemies.isNotEmpty()) {
+            val ref = enemies.random()
+            flyoverX = ref.getPosition().x * PPM
+            flyoverY = ref.getPosition().y * PPM
+        } else {
+            flyoverX = 256f; flyoverY = 1000f
+        }
 
         for (i in 0 until info.bombCount) {
             Timer.schedule(object : Timer.Task() {
@@ -682,9 +720,9 @@ class StageScreen(
         Timer.schedule(object : Timer.Task() {
             override fun run() {
                 if (gameEnded) return
-                spawnPlaneFlyover(flyoverX)
+                spawnPlaneFlyover(flyoverX, flyoverY)
             }
-        }, 2f)
+        }, 1f)
     }
 
     private fun executeAirstrikeNuke(info: AirstrikeNukeInfo) {
@@ -735,9 +773,9 @@ class StageScreen(
         Timer.schedule(object : Timer.Task() {
             override fun run() {
                 if (gameEnded) return
-                spawnPlaneFlyover(centerPixel.x)
+                spawnPlaneFlyover(centerPixel.x, centerPixel.y)
             }
-        }, 2f)
+        }, 1f)
     }
 
     private fun executeAirstrikeEMP(info: AirStrikeEMPInfo) {
@@ -778,9 +816,9 @@ class StageScreen(
         Timer.schedule(object : Timer.Task() {
             override fun run() {
                 if (gameEnded) return
-                spawnPlaneFlyover(avgX * PPM)
+                spawnPlaneFlyover(avgX * PPM, avgY * PPM)
             }
-        }, 2f)
+        }, 1f)
     }
 
     private fun executeCrossfireMissile(info: CrossfireMissileInfo) {

@@ -5,6 +5,7 @@ import com.badlogic.gdx.scenes.scene2d.InputEvent
 import com.badlogic.gdx.scenes.scene2d.Touchable
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
 import com.badlogic.gdx.utils.Timer
+import fr.mesabloo.heavymachdefense.DEV
 import fr.mesabloo.heavymachdefense.MainGame
 import fr.mesabloo.heavymachdefense.managers.assets.assetManager
 import fr.mesabloo.heavymachdefense.managers.assets.buttonAssetsManager
@@ -25,7 +26,7 @@ class SelectOrLoadStage(private val screen: StageSelectionScreen, private val in
     override fun clicked(event: InputEvent?, x: Float, y: Float) {
         Gdx.app.debug(this.javaClass.simpleName, "Clicked on item number $index")
 
-        if (index > this.screen.save.lastStageCompleted)
+        if (!DEV && index > this.screen.save.lastStageCompleted)
             return
 
         if (this.screen.scrollPane.selected == index) {

@@ -51,9 +51,12 @@ import fr.mesabloo.heavymachdefense.world.GameWorld
 import fr.mesabloo.heavymachdefense.world.UI_HEIGHT
 import fr.mesabloo.heavymachdefense.world.UI_WIDTH
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import ktx.actors.alpha
 import ktx.actors.setScrollFocus
+import ktx.preferences.flush
+import ktx.preferences.set
 import kotlin.math.pow
 import kotlin.properties.Delegates
 
@@ -106,6 +109,7 @@ class StageScreen(
 
     private var playerLife: Long = 500L
     private var enemyLife: Long = 500L
+    private var lowHpWarningPlayed: Boolean = false
 
     private val menuTweenManager = TweenManager()
 
@@ -173,6 +177,8 @@ class StageScreen(
         this.bgm.volume = this.backgroundMusicVolume
         this.bgm.play()
 
+        stageAssetsManager.effectsVolume = this.effectsVolume
+
         this.systemMenu = SystemMenu(this::backgroundMusicVolume, this::effectsVolume, this)
 
         lateinit var scrollpane: ScrollPane
@@ -216,6 +222,7 @@ class StageScreen(
             })
 
         this.background.addActor(BuildQueue(this::upgradeMenuShown, this.upgrades, this.save) { item ->
+            stageAssetsManager.playUiSound(StageAssetsManager.SOUND_BUILD_COMPLETE)
             when (item) {
                 is BuildMachineItem -> spawnMachine(item.kind, item.level)
             }
@@ -395,7 +402,7 @@ class StageScreen(
             val levelWaves: LevelWaves = Json.decodeFromString(waveFile.readString())
             this.waveManager = WaveManager(levelWaves) { info -> spawnEnemyTank(info) }
         } else {
-            this.waveManager = WaveManager(LevelWaves(emptyList())) {}
+            this.waveManager = WaveManager(generateDefaultWaves(level)) { info -> spawnEnemyTank(info) }
         }
     }
 
@@ -702,6 +709,13 @@ class StageScreen(
             playerLife = allyBaseEntity.hp.toLong().coerceAtLeast(0L)
             enemyLife = enemyBaseEntity.hp.toLong().coerceAtLeast(0L)
 
+            // Low HP warning when base drops below 25%
+            if (!lowHpWarningPlayed && allyBaseEntity.isAlive
+                && allyBaseEntity.hp < allyBaseEntity.maxHp * 0.25f) {
+                lowHpWarningPlayed = true
+                stageAssetsManager.playUiSound(StageAssetsManager.SOUND_LOW_HP)
+            }
+
             // Check game over / victory
             if (!allyBaseEntity.isAlive && !gameEnded) {
                 gameEnded = true
@@ -710,6 +724,13 @@ class StageScreen(
             } else if (!enemyBaseEntity.isAlive && !gameEnded) {
                 gameEnded = true
                 gameEndTimer = 0f
+                // Unlock next stage if this is the furthest cleared
+                if (this.level > this.save.lastStageCompleted) {
+                    this.save.lastStageCompleted = this.level.coerceAtMost(79)
+                    Gdx.app.getPreferences(GameSave.PREFERENCES_PATH).flush {
+                        this[this@StageScreen.saveIndex.toString()] = Json.encodeToString(this@StageScreen.save)
+                    }
+                }
                 showGameResult(true)
             }
         }

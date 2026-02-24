@@ -32,7 +32,8 @@ class EnemyTank(tankTypeId: String) : Group() {
             it.setPosition(0f, 0f)
         })
 
-        val weaponRegion = stageAssetsManager.unsafeRegion(StageAssetsManager.TANK_WEAPONS, tankTypeId)
+        val weaponRegion = stageAssetsManager.safeRegion(StageAssetsManager.TANK_WEAPONS, tankTypeId)
+            ?: stageAssetsManager.unsafeRegion(StageAssetsManager.TANK_WEAPONS, "$tankTypeId-01")
         this.weaponImage = Image(weaponRegion)
         this.addActor(weaponImage.also {
             it.setPosition(

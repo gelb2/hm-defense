@@ -13,7 +13,7 @@ import fr.mesabloo.heavymachdefense.data.models.MachineModel
 import fr.mesabloo.heavymachdefense.managers.assets.StageAssetsManager
 import fr.mesabloo.heavymachdefense.managers.assets.stageAssetsManager
 
-class Machine(kind: MachineKind, level: Int) : Group() {
+class Machine(val kind: MachineKind, level: Int) : Group() {
     var physicsBody: Body? = null
 
     var hp: Int = 100

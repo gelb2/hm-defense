@@ -11,11 +11,21 @@ class WaveManager(
     private var currentWaveIndex = 0
     private var groupTrackers: List<GroupTracker>? = null
     private var waveStartTime = 0f
+    private var loopPauseRemaining = 0f
 
-    val isComplete: Boolean get() = currentWaveIndex >= levelWaves.waves.size
+    companion object {
+        private const val LOOP_PAUSE_SECONDS = 5f
+    }
 
     fun update(delta: Float) {
-        if (isComplete) return
+        if (levelWaves.waves.isEmpty()) return
+
+        // Pause between loops
+        if (loopPauseRemaining > 0f) {
+            loopPauseRemaining -= delta
+            return
+        }
+
         elapsed += delta
 
         val wave = levelWaves.waves[currentWaveIndex]
@@ -33,6 +43,12 @@ class WaveManager(
             if (allDone) {
                 currentWaveIndex++
                 groupTrackers = null
+                // Loop back to first wave when all waves exhausted
+                if (currentWaveIndex >= levelWaves.waves.size) {
+                    currentWaveIndex = 0
+                    elapsed = 0f
+                    loopPauseRemaining = LOOP_PAUSE_SECONDS
+                }
             }
         }
     }

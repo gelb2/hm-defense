@@ -34,7 +34,8 @@ import ktx.math.vec2
  *     }
  *   },
  *   "feet": {
- *     // TODO
+ *     "regions": string[],  // region names in feet.atlas for animation frames
+ *     "offset": float[2]    // offset from center of body for left foot (right foot is Y-mirrored)
  *   }
  * }
  * ```
@@ -76,7 +77,16 @@ class MachineModel(name: String, level: Int) {
      */
     val rightWeaponOffset: Pair<Float, Float>
 
-    // TODO: feet
+    /**
+     * Region names in feet.atlas for walking animation frames, or null if no feet data.
+     */
+    val feetRegions: List<String>?
+
+    /**
+     * The offset from the center of the main body for the left foot, in pixels.
+     * The right foot is positioned with Y-mirrored offset.
+     */
+    val feetOffset: Pair<Float, Float>?
 
     init {
         val handle = Gdx.files.internal("data/models/machines/${name}-${level.toString().padStart(2, '0')}.json")
@@ -105,7 +115,15 @@ class MachineModel(name: String, level: Int) {
         this.rightWeaponSize = Pair(rightWeaponSize[0], rightWeaponSize[1])
         this.rightWeaponOffset = Pair(rightWeaponOffset[0], rightWeaponOffset[1])
 
-        // TODO: feet
+        if (feet != null && !feet.isArray) {
+            val regions = feet.get("regions").asStringArray().toList()
+            val offset = feet.get("offset").asFloatArray()
+            this.feetRegions = regions
+            this.feetOffset = Pair(offset[0], offset[1])
+        } else {
+            this.feetRegions = null
+            this.feetOffset = null
+        }
     }
 
     /**

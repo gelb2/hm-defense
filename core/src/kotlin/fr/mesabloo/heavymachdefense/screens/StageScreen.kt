@@ -5,10 +5,15 @@ import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.scenes.scene2d.Group
 import com.badlogic.gdx.scenes.scene2d.Touchable
 import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane
+import com.badlogic.gdx.physics.box2d.BodyDef
 import fr.mesabloo.heavymachdefense.MainGame
+import fr.mesabloo.heavymachdefense.PPM
 import fr.mesabloo.heavymachdefense.data.*
+import fr.mesabloo.heavymachdefense.entities.buildMachineTemplate
 import fr.mesabloo.heavymachdefense.entities.createBases
 import fr.mesabloo.heavymachdefense.entities.createTerrainBody
+import ktx.box2d.body
+import ktx.box2d.box
 import fr.mesabloo.heavymachdefense.data.Specials
 import fr.mesabloo.heavymachdefense.listeners.stage.*
 import fr.mesabloo.heavymachdefense.managers.animationManager
@@ -44,6 +49,7 @@ class StageScreen(
         const val TEMPORARY_CELL_UPGRADE_RATIO = 0.6f
         const val SLOT_MENU_WIDTH = 128f
         const val SLOT_MENU_HEIGHT = 710f
+        const val MACHINE_SPEED = 12.5f // pixels per second
     }
 
     private lateinit var buildQueue: BuildQueue
@@ -165,7 +171,11 @@ class StageScreen(
                 it.setPosition(630f, 972f)
             })
 
-        this.background.addActor(BuildQueue(this::upgradeMenuShown, this.upgrades, this.save).also {
+        this.background.addActor(BuildQueue(this::upgradeMenuShown, this.upgrades, this.save) { item ->
+            when (item) {
+                is BuildMachineItem -> spawnMachine(item.kind, item.level)
+            }
+        }.also {
             this.buildQueue = it
 
             it.height = 508f
@@ -314,6 +324,36 @@ class StageScreen(
         this.background.addActor(Radar(scrollpane).also {
             it.setPosition(22f, 698f)
         })
+    }
+
+    private fun spawnMachine(kind: MachineKind, level: Int) {
+        val machine = buildMachineTemplate(kind, level)
+
+        // Face upward (only for terrain machines, not UI slots)
+        machine.setOrigin(machine.width / 2f, machine.height / 2f)
+        machine.rotation = 90f
+
+        val body = this.gameWorld.world.body {
+            type = BodyDef.BodyType.KinematicBody
+            box(
+                width = machine.width / PPM,
+                height = machine.height / PPM
+            ) {
+                density = 10f
+                restitution = 0f
+                friction = 1f
+                isSensor = false
+            }
+            userData = machine
+            position.set(
+                (256f + machine.width / 2f) / PPM,
+                (160f + machine.height / 2f) / PPM
+            )
+        }
+
+        // Walking animation controls body velocity (step-based movement)
+        machine.physicsBody = body
+        machine.startWalkingAnimation(MACHINE_SPEED)
     }
 
     override fun render(delta: Float) {

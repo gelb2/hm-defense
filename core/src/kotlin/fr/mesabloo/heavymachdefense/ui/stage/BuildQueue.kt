@@ -3,18 +3,13 @@ package fr.mesabloo.heavymachdefense.ui.stage
 import aurelienribon.tweenengine.Tween
 import aurelienribon.tweenengine.TweenManager
 import aurelienribon.tweenengine.equations.Expo
-import com.badlogic.gdx.Gdx
-import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.scenes.scene2d.Actor
 import com.badlogic.gdx.scenes.scene2d.Group
 import com.badlogic.gdx.scenes.scene2d.ui.Image
-import com.badlogic.gdx.scenes.scene2d.ui.Label
 import com.badlogic.gdx.utils.Queue
 import fr.mesabloo.heavymachdefense.data.*
-import fr.mesabloo.heavymachdefense.managers.FontManager
 import fr.mesabloo.heavymachdefense.managers.assets.StageAssetsManager
 import fr.mesabloo.heavymachdefense.managers.assets.stageAssetsManager
-import fr.mesabloo.heavymachdefense.managers.fontManager
 import fr.mesabloo.heavymachdefense.timers.cellMiningTimer
 import fr.mesabloo.heavymachdefense.tweens.ActorAccessor
 import fr.mesabloo.heavymachdefense.tweens.ActorAccessor.Companion.POSITION
@@ -44,12 +39,21 @@ private class BuildItemActor(val item: BuildItem) : Group() {
             it.setPosition(-32f, -32f)
         })
 
-        this.addActor(Label("TODO", Label.LabelStyle().also {
-            it.font = fontManager.bitmapFonts[FontManager.TREBUCHET_MS_20_BLUE]
-            it.fontColor = Color.MAGENTA
-        }).also {
-            it.setPosition(32f - it.width / 2f, 32f - it.height / 2f)
-        })
+        // Machine/turret icon instead of "TODO"
+        when (item) {
+            is BuildMachineItem -> {
+                val oLevel = item.level.toString().padStart(2, '0')
+                this.addActor(Image(stageAssetsManager.unsafeRegion(
+                    StageAssetsManager.MACHINE_BODIES,
+                    "${item.kind.machineName}-$oLevel"
+                )).also {
+                    it.rotation = 90f
+                    val scale = 48f / maxOf(it.width, it.height)
+                    it.setSize(it.width * scale, it.height * scale)
+                    it.setPosition(32f + it.height / 2f, 32f - it.width / 2f)
+                })
+            }
+        }
 
         this.addActor(Image(stageAssetsManager.get(StageAssetsManager.UI.BUILD_QUEUE_GAUGE)).also {
             this.gauge = it
@@ -70,6 +74,7 @@ class BuildQueue(
     private val upgradeMenuShown: KMutableProperty0<Boolean>,
     private val upgrades: Upgrades,
     private val save: GameSave,
+    private val onBuildComplete: (BuildItem) -> Unit = {},
 ) : Group() {
     private companion object {
         const val SLOT_HEIGHT = 64f
@@ -144,7 +149,7 @@ class BuildQueue(
                     this.tweenManager.killTarget(item, POSITION)
                     item.remove()
 
-                    Gdx.app.debug(this.javaClass.simpleName, "TODO: create machine in world")
+                    this.onBuildComplete(item.item)
                 } else {
                     index += 1
                 }

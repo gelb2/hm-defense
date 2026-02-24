@@ -20,7 +20,7 @@ class StageAssetsManager : Disposable {
 
         const val MACHINE_BODIES = "gfx/models/machines/bodies.atlas"
         const val MACHINE_WEAPONS = "gfx/models/machines/weapons.atlas"
-        // TODO: feet
+        const val MACHINE_FEET = "gfx/models/machines/feet.atlas"
 
         const val ALLY_TURRET_BODIES = "gfx/models/turrets/ally-bodies.atlas"
         const val ALLY_TURRET_WEAPONS = "gfx/models/turrets/ally-weapons.atlas"
@@ -112,6 +112,7 @@ class StageAssetsManager : Disposable {
     private fun allAtlases() = listOf(
         MACHINE_BODIES,
         MACHINE_WEAPONS,
+        MACHINE_FEET,
         ALLY_TURRET_BODIES,
         ALLY_TURRET_WEAPONS,
         ENEMY_TURRET_BODIES,

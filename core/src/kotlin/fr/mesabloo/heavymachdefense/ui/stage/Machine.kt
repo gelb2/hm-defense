@@ -6,12 +6,16 @@ import com.badlogic.gdx.scenes.scene2d.Action
 import com.badlogic.gdx.scenes.scene2d.Group
 import com.badlogic.gdx.scenes.scene2d.ui.Image
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable
+import com.badlogic.gdx.physics.box2d.Body
+import fr.mesabloo.heavymachdefense.PPM
 import fr.mesabloo.heavymachdefense.data.MachineKind
 import fr.mesabloo.heavymachdefense.data.models.MachineModel
 import fr.mesabloo.heavymachdefense.managers.assets.StageAssetsManager
 import fr.mesabloo.heavymachdefense.managers.assets.stageAssetsManager
 
 class Machine(kind: MachineKind, level: Int) : Group() {
+    var physicsBody: Body? = null
+
     private var leftFoot: Image? = null
     private var rightFoot: Image? = null
     private var feetFrames: List<TextureRegion>? = null
@@ -86,11 +90,19 @@ class Machine(kind: MachineKind, level: Int) : Group() {
      * Starts the walking animation cycle for feet sprites.
      * Only call this for terrain machines, not UI preview slots.
      */
-    fun startWalkingAnimation() {
+    /**
+     * Starts step-based walking animation. Each cycle:
+     * left foot step (burst forward + sway right) → pause → right foot step (burst forward + sway left) → pause.
+     * Controls Box2D body velocity directly so the machine lurches forward with each step.
+     *
+     * @param moveSpeed average forward speed in pixels/sec
+     */
+    fun startWalkingAnimation(moveSpeed: Float) {
         val frames = this.feetFrames ?: return
         val framesFlipped = this.feetFramesFlipped ?: return
         val lFoot = this.leftFoot ?: return
         val rFoot = this.rightFoot ?: return
+        val pBody = this.physicsBody ?: return
 
         lFoot.isVisible = true
         rFoot.isVisible = true
@@ -98,19 +110,50 @@ class Machine(kind: MachineKind, level: Int) : Group() {
         this.addAction(object : Action() {
             private var elapsed = 0f
             private val frameDuration = 0.15f
+            private val stepDuration = frames.size * frameDuration   // 0.45s for 3 frames
+            private val pauseDuration = 0.25f
+            private val halfCycle = stepDuration + pauseDuration     // 0.70s
+            private val fullCycle = halfCycle * 2f                   // 1.40s
+            // Burst speed compensates for pauses to maintain average moveSpeed
+            private val burstSpeed = moveSpeed * fullCycle / (stepDuration * 2f)
+            private val swayAmount = 2.5f
 
             override fun act(delta: Float): Boolean {
                 elapsed += delta
+                val cycleTime = elapsed % fullCycle
 
-                // Cycle feet textures
-                val frameIdx = ((elapsed / frameDuration).toInt()) % frames.size
-                val altIdx = (frameIdx + frames.size / 2) % frames.size
-                lFoot.drawable = TextureRegionDrawable(frames[frameIdx])
-                rFoot.drawable = TextureRegionDrawable(framesFlipped[altIdx])
+                when {
+                    // Left foot step: animate left foot, move forward, sway right
+                    cycleTime < stepDuration -> {
+                        val phaseTime = cycleTime
+                        val frameIdx = (phaseTime / frameDuration).toInt().coerceIn(0, frames.size - 1)
+                        lFoot.drawable = TextureRegionDrawable(frames[frameIdx])
 
-                // Walking body sway (reset each frame by GameWorld.render())
-                actor.x += MathUtils.sin(elapsed * 6f) * 1.0f
-                actor.y += MathUtils.sin(elapsed * 12f).coerceAtLeast(0f) * 0.8f
+                        pBody.setLinearVelocity(0f, burstSpeed / PPM)
+
+                        val progress = phaseTime / stepDuration
+                        actor.x += MathUtils.sin(progress * MathUtils.PI) * swayAmount
+                    }
+                    // Pause after left step
+                    cycleTime < halfCycle -> {
+                        pBody.setLinearVelocity(0f, 0f)
+                    }
+                    // Right foot step: animate right foot, move forward, sway left
+                    cycleTime < halfCycle + stepDuration -> {
+                        val phaseTime = cycleTime - halfCycle
+                        val frameIdx = (phaseTime / frameDuration).toInt().coerceIn(0, frames.size - 1)
+                        rFoot.drawable = TextureRegionDrawable(framesFlipped[frameIdx])
+
+                        pBody.setLinearVelocity(0f, burstSpeed / PPM)
+
+                        val progress = phaseTime / stepDuration
+                        actor.x -= MathUtils.sin(progress * MathUtils.PI) * swayAmount
+                    }
+                    // Pause after right step
+                    else -> {
+                        pBody.setLinearVelocity(0f, 0f)
+                    }
+                }
 
                 return false
             }

@@ -5,7 +5,6 @@ import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.scenes.scene2d.Group
 import com.badlogic.gdx.scenes.scene2d.Touchable
 import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane
-import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.physics.box2d.BodyDef
 import fr.mesabloo.heavymachdefense.MainGame
 import fr.mesabloo.heavymachdefense.PPM
@@ -50,7 +49,7 @@ class StageScreen(
         const val TEMPORARY_CELL_UPGRADE_RATIO = 0.6f
         const val SLOT_MENU_WIDTH = 128f
         const val SLOT_MENU_HEIGHT = 710f
-        const val MACHINE_SPEED = 50f // pixels per second
+        const val MACHINE_SPEED = 12.5f // pixels per second
     }
 
     private lateinit var buildQueue: BuildQueue
@@ -333,7 +332,6 @@ class StageScreen(
         // Face upward (only for terrain machines, not UI slots)
         machine.setOrigin(machine.width / 2f, machine.height / 2f)
         machine.rotation = 90f
-        machine.startWalkingAnimation()
 
         val body = this.gameWorld.world.body {
             type = BodyDef.BodyType.KinematicBody
@@ -352,7 +350,10 @@ class StageScreen(
                 (160f + machine.height / 2f) / PPM
             )
         }
-        body.linearVelocity = Vector2(0f, MACHINE_SPEED / PPM)
+
+        // Walking animation controls body velocity (step-based movement)
+        machine.physicsBody = body
+        machine.startWalkingAnimation(MACHINE_SPEED)
     }
 
     override fun render(delta: Float) {

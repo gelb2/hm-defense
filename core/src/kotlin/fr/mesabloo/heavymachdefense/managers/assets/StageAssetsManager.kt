@@ -64,6 +64,10 @@ class StageAssetsManager : Disposable {
         const val SOUND_AIRSTRIKE = "sfx/effects/airstrike.wav"
         const val SOUND_GROUND_HIT = "sfx/effects/ground-hit.wav"
 
+        val SPECIAL_IMPACT_SOUNDS: List<String> = listOf(
+            SOUND_GROUND_HIT, SOUND_GROUND_EXPLOSION
+        ) + SOUND_BODY_HITS
+
         private val ALL_COMBAT_SOUND_PATHS = listOf(
             SOUND_ENEMY_FIRE, SOUND_GROUND_EXPLOSION, SOUND_MACH_EXPLOSION,
             SOUND_AIRSTRIKE, SOUND_GROUND_HIT
@@ -256,6 +260,8 @@ class StageAssetsManager : Disposable {
     fun sound(path: String): Sound = assetManager.get(path)
 
     fun randomBodyHitSound(): Sound = assetManager.get(SOUND_BODY_HITS.random())
+
+    fun randomSpecialImpactSound(): Sound = assetManager.get(SPECIAL_IMPACT_SOUNDS.random())
 
     override fun dispose() {
         if (this.stageLevel != null) {

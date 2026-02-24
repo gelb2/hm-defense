@@ -603,15 +603,19 @@ class StageScreen(
             Timer.schedule(object : Timer.Task() {
                 override fun run() {
                     if (gameEnded) return
-                    val enemies = gameObjects.filter { it is EnemyTankEntity && it.isAlive }
-                    if (enemies.isEmpty()) return
-                    val target = enemies.random() as EnemyTankEntity
-                    val pos = target.getPosition().cpy().scl(PPM)
-                    pos.x += (-20..20).random()
-                    pos.y += (-20..20).random()
-                    target.tank.hp -= damage
+                    val enemies = gameObjects.filterIsInstance<EnemyTankEntity>().filter { it.isAlive }
+                    val pos: Vector2
+                    if (enemies.isNotEmpty()) {
+                        val target = enemies.random()
+                        pos = target.getPosition().cpy().scl(PPM)
+                        pos.x += (-20..20).random()
+                        pos.y += (-20..20).random()
+                        target.tank.hp -= damage
+                    } else {
+                        pos = Vector2((50..460).random().toFloat(), (200..1800).random().toFloat())
+                    }
                     spawnEffect("explode-ground", pos)
-                    stageAssetsManager.sound(StageAssetsManager.SOUND_GROUND_HIT).play(effectsVolume)
+                    stageAssetsManager.randomSpecialImpactSound().play(effectsVolume)
                 }
             }, i * 0.12f)
         }
@@ -623,15 +627,19 @@ class StageScreen(
             Timer.schedule(object : Timer.Task() {
                 override fun run() {
                     if (gameEnded) return
-                    val enemies = gameObjects.filter { it is EnemyTankEntity && it.isAlive }
-                    if (enemies.isEmpty()) return
-                    val target = enemies.random() as EnemyTankEntity
-                    val pos = target.getPosition().cpy().scl(PPM)
-                    pos.x += (-15..15).random()
-                    pos.y += (-15..15).random()
-                    target.tank.hp -= damage
+                    val enemies = gameObjects.filterIsInstance<EnemyTankEntity>().filter { it.isAlive }
+                    val pos: Vector2
+                    if (enemies.isNotEmpty()) {
+                        val target = enemies.random()
+                        pos = target.getPosition().cpy().scl(PPM)
+                        pos.x += (-15..15).random()
+                        pos.y += (-15..15).random()
+                        target.tank.hp -= damage
+                    } else {
+                        pos = Vector2((50..460).random().toFloat(), (200..1800).random().toFloat())
+                    }
                     spawnEffect("explode-02", pos)
-                    stageAssetsManager.sound("sfx/weapon/missile.wav").play(effectsVolume)
+                    stageAssetsManager.randomSpecialImpactSound().play(effectsVolume)
                 }
             }, i * 0.15f)
         }
@@ -642,10 +650,18 @@ class StageScreen(
         val rangeWorld = info.range.toFloat() / PPM
 
         val enemies = gameObjects.filterIsInstance<EnemyTankEntity>().filter { it.isAlive }
-        if (enemies.isEmpty()) return
-        val avgX = enemies.map { it.getPosition().x }.average().toFloat()
-        val avgY = enemies.map { it.getPosition().y }.average().toFloat()
-        val centerPixel = Vector2(avgX * PPM, avgY * PPM)
+        val centerPixel: Vector2
+        val avgX: Float
+        val avgY: Float
+        if (enemies.isNotEmpty()) {
+            avgX = enemies.map { it.getPosition().x }.average().toFloat()
+            avgY = enemies.map { it.getPosition().y }.average().toFloat()
+            centerPixel = Vector2(avgX * PPM, avgY * PPM)
+        } else {
+            centerPixel = Vector2(256f, 1000f)
+            avgX = centerPixel.x / PPM
+            avgY = centerPixel.y / PPM
+        }
 
         Timer.schedule(object : Timer.Task() {
             override fun run() {
@@ -666,6 +682,7 @@ class StageScreen(
                         override fun run() {
                             if (gameEnded) return
                             spawnEffect("explode-ground", offset)
+                            stageAssetsManager.randomSpecialImpactSound().play(effectsVolume)
                         }
                     }, j * 0.08f)
                 }
@@ -680,9 +697,15 @@ class StageScreen(
         val paralysisTime = info.paralysisTime.toFloat()
 
         val enemies = gameObjects.filterIsInstance<EnemyTankEntity>().filter { it.isAlive }
-        if (enemies.isEmpty()) return
-        val avgX = enemies.map { it.getPosition().x }.average().toFloat()
-        val avgY = enemies.map { it.getPosition().y }.average().toFloat()
+        val avgX: Float
+        val avgY: Float
+        if (enemies.isNotEmpty()) {
+            avgX = enemies.map { it.getPosition().x }.average().toFloat()
+            avgY = enemies.map { it.getPosition().y }.average().toFloat()
+        } else {
+            avgX = 256f / PPM
+            avgY = 1000f / PPM
+        }
 
         Timer.schedule(object : Timer.Task() {
             override fun run() {
@@ -697,7 +720,9 @@ class StageScreen(
                     val pos = target.getPosition().cpy().scl(PPM)
                     spawnEffect("lightning", pos)
                 }
-                stageAssetsManager.sound(StageAssetsManager.SOUND_GROUND_HIT).play(effectsVolume)
+                // Always play EMP discharge effect even with no targets
+                spawnEffect("lightning", Vector2(avgX * PPM, avgY * PPM))
+                stageAssetsManager.randomSpecialImpactSound().play(effectsVolume)
             }
         }, 0.3f)
     }
@@ -738,9 +763,12 @@ class StageScreen(
                             { hitPos ->
                                 target.tank.hp -= damage
                                 spawnEffect("explode-01", hitPos)
-                                stageAssetsManager.sound(StageAssetsManager.SOUND_GROUND_HIT).play(effectsVolume)
+                                stageAssetsManager.randomSpecialImpactSound().play(effectsVolume)
                             },
-                            {},
+                            {
+                                spawnEffect("explode-01", targetPos)
+                                stageAssetsManager.randomSpecialImpactSound().play(effectsVolume)
+                            },
                             trailRegions = smokeTrail,
                             arcHeight = arcAmount
                         )

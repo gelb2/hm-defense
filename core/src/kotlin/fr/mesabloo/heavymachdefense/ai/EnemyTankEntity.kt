@@ -14,6 +14,8 @@ class EnemyTankEntity(
     private val moveSpeed: Float
 ) : GameObject() {
 
+    var paralyzedTimer: Float = 0f
+
     private var tagged = false
 
     // --- GameObject abstracts ---
@@ -29,6 +31,7 @@ class EnemyTankEntity(
     override val isAlive: Boolean get() = tank.isAlive
 
     override fun walk() {
+        if (paralyzedTimer > 0f) return
         tank.walking = true
         body.setLinearVelocity(0f, -moveSpeed / PPM) // walk DOWNWARD
     }

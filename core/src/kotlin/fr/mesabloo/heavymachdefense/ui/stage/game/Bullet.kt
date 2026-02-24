@@ -19,7 +19,8 @@ class Bullet(
     private val onMiss: () -> Unit,
     private val trailRegions: GdxArray<TextureAtlas.AtlasRegion>? = null,
     private val trailInterval: Float = 0.04f,
-    private val trailScale: Float = 0.5f
+    private val trailScale: Float = 0.5f,
+    private val arcHeight: Float = 0f
 ) : Image(region) {
 
     init {
@@ -29,19 +30,41 @@ class Bullet(
         val angle = MathUtils.atan2(targetPos.y - startPos.y, targetPos.x - startPos.x)
         rotation = angle * MathUtils.radiansToDegrees
 
+        // Perpendicular direction for arc offset (rotate 90 degrees left)
+        val dx = targetPos.x - startPos.x
+        val dy = targetPos.y - startPos.y
+        val dist = startPos.dst(targetPos).coerceAtLeast(1f)
+        val perpX = -dy / dist
+        val perpY = dx / dist
+
         addAction(object : Action() {
             private var elapsed = 0f
             private val totalDistance = startPos.dst(targetPos).coerceAtLeast(1f)
             private val totalTime = totalDistance / speed
             private var trailTimer = 0f
+            private var prevX = startPos.x
+            private var prevY = startPos.y
 
             override fun act(delta: Float): Boolean {
                 elapsed += delta
                 val progress = (elapsed / totalTime).coerceIn(0f, 1f)
 
-                val currentX = MathUtils.lerp(startPos.x, targetPos.x, progress)
-                val currentY = MathUtils.lerp(startPos.y, targetPos.y, progress)
+                val baseX = MathUtils.lerp(startPos.x, targetPos.x, progress)
+                val baseY = MathUtils.lerp(startPos.y, targetPos.y, progress)
+
+                // Arc offset: sine curve perpendicular to the flight path
+                val arcOffset = arcHeight * MathUtils.sin(MathUtils.PI * progress)
+                val currentX = baseX + perpX * arcOffset
+                val currentY = baseY + perpY * arcOffset
+
                 actor.setPosition(currentX - actor.width / 2f, currentY - actor.height / 2f)
+
+                // Update rotation to follow the arc tangent
+                if (arcHeight != 0f) {
+                    actor.rotation = MathUtils.atan2(currentY - prevY, currentX - prevX) * MathUtils.radiansToDegrees
+                }
+                prevX = currentX
+                prevY = currentY
 
                 // Spawn smoke trail
                 if (trailRegions != null && progress < 1f) {

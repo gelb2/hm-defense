@@ -61,8 +61,13 @@ class StageAssetsManager : Disposable {
         const val SOUND_GROUND_EXPLOSION = "sfx/effects/ground-explosion.wav"
         const val SOUND_MACH_EXPLOSION = "sfx/effects/mach-explosion.wav"
         val SOUND_BODY_HITS: List<String> = (1..4).map { "sfx/effects/body-hit-%02d.wav".format(it) }
+        const val SOUND_AIRSTRIKE = "sfx/effects/airstrike.wav"
+        const val SOUND_GROUND_HIT = "sfx/effects/ground-hit.wav"
 
-        private val ALL_COMBAT_SOUND_PATHS = listOf(SOUND_ENEMY_FIRE, SOUND_GROUND_EXPLOSION, SOUND_MACH_EXPLOSION) + SOUND_BODY_HITS
+        private val ALL_COMBAT_SOUND_PATHS = listOf(
+            SOUND_ENEMY_FIRE, SOUND_GROUND_EXPLOSION, SOUND_MACH_EXPLOSION,
+            SOUND_AIRSTRIKE, SOUND_GROUND_HIT
+        ) + SOUND_BODY_HITS
 
         // UI / production sounds
         const val SOUND_BUILD_MACH = "sfx/ui/button-build-mach.wav"

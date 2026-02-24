@@ -106,6 +106,7 @@ class SystemMenu(
 
         when (`object`) {
             ButtonID.CLOSE, ButtonID.RESUME -> {
+                stageAssetsManager.playUiSound(StageAssetsManager.SOUND_BUTTON_OK)
                 this.hide()
             }
             else -> {

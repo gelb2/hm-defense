@@ -6,6 +6,8 @@ import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
 import fr.mesabloo.heavymachdefense.data.GameSave
 import fr.mesabloo.heavymachdefense.data.UpgradeKind
 import fr.mesabloo.heavymachdefense.data.Upgrades
+import fr.mesabloo.heavymachdefense.managers.assets.StageAssetsManager
+import fr.mesabloo.heavymachdefense.managers.assets.stageAssetsManager
 import fr.mesabloo.heavymachdefense.ui.stage.upgrade_menu.AbstractUpgradeLevelButton
 import kotlin.math.min
 
@@ -55,6 +57,7 @@ class UpgradeSelectedItem(
 
             this.save.credits -= upgradeCost
             this.save.mainUpgrades[selected.kind] = nextLevel
+            stageAssetsManager.playUiSound(StageAssetsManager.SOUND_UPGRADE_BASE)
 
             selected.level = Pair(nextLevel.toLong(), maxLevel.toLong())
             when (selected.kind) {

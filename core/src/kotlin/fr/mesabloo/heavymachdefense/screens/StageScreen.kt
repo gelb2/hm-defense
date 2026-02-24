@@ -109,6 +109,7 @@ class StageScreen(
 
     private var playerLife: Long = 500L
     private var enemyLife: Long = 500L
+    private var lowHpWarningPlayed: Boolean = false
 
     private val menuTweenManager = TweenManager()
 
@@ -176,6 +177,8 @@ class StageScreen(
         this.bgm.volume = this.backgroundMusicVolume
         this.bgm.play()
 
+        stageAssetsManager.effectsVolume = this.effectsVolume
+
         this.systemMenu = SystemMenu(this::backgroundMusicVolume, this::effectsVolume, this)
 
         lateinit var scrollpane: ScrollPane
@@ -219,6 +222,7 @@ class StageScreen(
             })
 
         this.background.addActor(BuildQueue(this::upgradeMenuShown, this.upgrades, this.save) { item ->
+            stageAssetsManager.playUiSound(StageAssetsManager.SOUND_BUILD_COMPLETE)
             when (item) {
                 is BuildMachineItem -> spawnMachine(item.kind, item.level)
             }
@@ -704,6 +708,13 @@ class StageScreen(
             // Sync HP bars with base entity HP
             playerLife = allyBaseEntity.hp.toLong().coerceAtLeast(0L)
             enemyLife = enemyBaseEntity.hp.toLong().coerceAtLeast(0L)
+
+            // Low HP warning when base drops below 25%
+            if (!lowHpWarningPlayed && allyBaseEntity.isAlive
+                && allyBaseEntity.hp < allyBaseEntity.maxHp * 0.25f) {
+                lowHpWarningPlayed = true
+                stageAssetsManager.playUiSound(StageAssetsManager.SOUND_LOW_HP)
+            }
 
             // Check game over / victory
             if (!allyBaseEntity.isAlive && !gameEnded) {

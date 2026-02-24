@@ -12,6 +12,7 @@ import ktx.assets.load
 
 class StageAssetsManager : Disposable {
     private var stageLevel: Int? = null
+    var effectsVolume: Float = 1.0f
 
     companion object {
         private fun backgrounds(level: Int): Pair<String, String> =
@@ -62,6 +63,24 @@ class StageAssetsManager : Disposable {
         val SOUND_BODY_HITS: List<String> = (1..4).map { "sfx/effects/body-hit-%02d.wav".format(it) }
 
         private val ALL_COMBAT_SOUND_PATHS = listOf(SOUND_ENEMY_FIRE, SOUND_GROUND_EXPLOSION, SOUND_MACH_EXPLOSION) + SOUND_BODY_HITS
+
+        // UI / production sounds
+        const val SOUND_BUILD_MACH = "sfx/ui/button-build-mach.wav"
+        const val SOUND_BUILD_STARTED = "sfx/game/build-started.wav"
+        const val SOUND_BUILD_COMPLETE = "sfx/game/build-complete.wav"
+        const val SOUND_UPGRADE_BASE = "sfx/game/upgrade-base.wav"
+        const val SOUND_CLICK = "sfx/ui/click.wav"
+        const val SOUND_BUTTON_OK = "sfx/ui/button-ok.wav"
+        const val SOUND_BUTTON_CANCEL = "sfx/ui/button-cancel.wav"
+        const val SOUND_BUTTON_FORMATION = "sfx/ui/button-formation.wav"
+        const val SOUND_BUTTON_SPECIAL = "sfx/ui/button-special.wav"
+        const val SOUND_LOW_HP = "sfx/game/low-hp.wav"
+
+        private val ALL_UI_SOUND_PATHS = listOf(
+            SOUND_BUILD_MACH, SOUND_BUILD_STARTED, SOUND_BUILD_COMPLETE,
+            SOUND_UPGRADE_BASE, SOUND_CLICK, SOUND_BUTTON_OK, SOUND_BUTTON_CANCEL,
+            SOUND_BUTTON_FORMATION, SOUND_BUTTON_SPECIAL, SOUND_LOW_HP
+        )
 
         const val ALLY_BASE = "gfx/models/base/ally-base.atlas"
         const val ENEMY_BASE = "gfx/models/base/enemy-base.atlas"
@@ -204,6 +223,7 @@ class StageAssetsManager : Disposable {
         this.allAtlases().forEach { assetManager.load<TextureAtlas>(it) }
         ALL_WEAPON_SOUND_PATHS.forEach { assetManager.load<Sound>(it) }
         ALL_COMBAT_SOUND_PATHS.forEach { assetManager.load<Sound>(it) }
+        ALL_UI_SOUND_PATHS.forEach { assetManager.load<Sound>(it) }
     }
 
     fun isFullyLoaded(): Boolean =
@@ -212,6 +232,7 @@ class StageAssetsManager : Disposable {
                 && this.allAtlases().all { assetManager.isLoaded(it) }
                 && ALL_WEAPON_SOUND_PATHS.all { assetManager.isLoaded(it) }
                 && ALL_COMBAT_SOUND_PATHS.all { assetManager.isLoaded(it) }
+                && ALL_UI_SOUND_PATHS.all { assetManager.isLoaded(it) }
 
     fun get(path: String): TextureRegion = TextureRegion(assetManager.get<Texture>(path))
 
@@ -244,6 +265,13 @@ class StageAssetsManager : Disposable {
         ALL_COMBAT_SOUND_PATHS.forEach {
             if (assetManager.isLoaded(it)) assetManager.unload(it)
         }
+        ALL_UI_SOUND_PATHS.forEach {
+            if (assetManager.isLoaded(it)) assetManager.unload(it)
+        }
+    }
+
+    fun playUiSound(path: String) {
+        sound(path).play(effectsVolume)
     }
 
     fun background(): Pair<TextureRegion, TextureRegion>? = this.stageLevel?.let { level ->

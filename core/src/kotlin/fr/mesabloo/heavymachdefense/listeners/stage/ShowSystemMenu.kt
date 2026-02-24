@@ -3,6 +3,8 @@ package fr.mesabloo.heavymachdefense.listeners.stage
 import com.badlogic.gdx.scenes.scene2d.InputEvent
 import com.badlogic.gdx.scenes.scene2d.Stage
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
+import fr.mesabloo.heavymachdefense.managers.assets.StageAssetsManager
+import fr.mesabloo.heavymachdefense.managers.assets.stageAssetsManager
 import fr.mesabloo.heavymachdefense.ui.stage.dialog.SystemMenu
 import kotlin.reflect.KProperty0
 
@@ -13,6 +15,7 @@ class ShowSystemMenu(
 ) : ClickListener() {
     override fun clicked(event: InputEvent, x: Float, y: Float) {
         if (!this.upgradeMenuShown.get()) {
+            stageAssetsManager.playUiSound(StageAssetsManager.SOUND_CLICK)
             this.menu.zIndex = 500000000
             this.menu.show(this.stage)
         }

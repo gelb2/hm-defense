@@ -3,6 +3,8 @@ package fr.mesabloo.heavymachdefense.listeners.stage
 import com.badlogic.gdx.scenes.scene2d.InputEvent
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
 import fr.mesabloo.heavymachdefense.data.Builds
+import fr.mesabloo.heavymachdefense.managers.assets.StageAssetsManager
+import fr.mesabloo.heavymachdefense.managers.assets.stageAssetsManager
 import fr.mesabloo.heavymachdefense.ui.stage.BuildMachineItem
 import fr.mesabloo.heavymachdefense.ui.stage.BuildQueue
 import fr.mesabloo.heavymachdefense.ui.stage.slots.BuildSlot
@@ -23,6 +25,7 @@ class BuildMachineIfPossible(
             val currentCells = this.cells.get()
 
             this.cells.set(currentCells - this.slot.cellCost)
+            stageAssetsManager.playUiSound(StageAssetsManager.SOUND_BUILD_MACH)
 
             this.buildQueue.build(
                 when (this.slot) {

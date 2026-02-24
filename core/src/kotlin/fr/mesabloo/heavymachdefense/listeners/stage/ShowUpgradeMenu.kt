@@ -10,6 +10,8 @@ import com.badlogic.gdx.scenes.scene2d.Group
 import com.badlogic.gdx.scenes.scene2d.InputEvent
 import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
+import fr.mesabloo.heavymachdefense.managers.assets.StageAssetsManager
+import fr.mesabloo.heavymachdefense.managers.assets.stageAssetsManager
 import fr.mesabloo.heavymachdefense.timers.cellMiningTimer
 import fr.mesabloo.heavymachdefense.tweens.ActorAccessor.Companion.POSITION
 import fr.mesabloo.heavymachdefense.tweens.ActorAccessor.Companion.SIZE
@@ -26,6 +28,7 @@ class ShowUpgradeMenu(
     }
 
     override fun clicked(event: InputEvent?, x: Float, y: Float) {
+        stageAssetsManager.playUiSound(StageAssetsManager.SOUND_CLICK)
         if ((this.controlsPane.y < -1f).also { this.upgradeMenuShown.set(it) }) {
             // menu is closed, open it
             this.open()

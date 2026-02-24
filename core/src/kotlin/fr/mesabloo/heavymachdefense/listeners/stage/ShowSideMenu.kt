@@ -6,6 +6,7 @@ import com.badlogic.gdx.scenes.scene2d.InputEvent
 import com.badlogic.gdx.scenes.scene2d.Touchable
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
 import fr.mesabloo.heavymachdefense.managers.assets.StageAssetsManager
+import fr.mesabloo.heavymachdefense.managers.assets.stageAssetsManager
 import ktx.actors.alpha
 import kotlin.reflect.KMutableProperty0
 
@@ -21,6 +22,7 @@ class ShowBuildSideMenu(
         Gdx.app.debug(this.javaClass.simpleName, "Clicked")
 
         this.titleKind.set(StageAssetsManager.UI.TitleKind.BUILD_MACH)
+        stageAssetsManager.playUiSound(StageAssetsManager.SOUND_BUTTON_FORMATION)
 
         this.machineSlots.alpha = 1f
         this.machineSlots.touchable = Touchable.enabled
@@ -42,6 +44,7 @@ class ShowSpecialSideMenu(
         Gdx.app.debug(this.javaClass.simpleName, "Clicked")
 
         this.titleKind.set(StageAssetsManager.UI.TitleKind.SPECIAL_ATTACK)
+        stageAssetsManager.playUiSound(StageAssetsManager.SOUND_BUTTON_SPECIAL)
 
         this.machineSlots.alpha = 0f
         this.machineSlots.touchable = Touchable.disabled

@@ -25,8 +25,10 @@ import ktx.box2d.body
 import ktx.box2d.box
 import fr.mesabloo.heavymachdefense.data.Specials
 import fr.mesabloo.heavymachdefense.listeners.stage.*
+import fr.mesabloo.heavymachdefense.managers.BackgroundMusicManager
 import fr.mesabloo.heavymachdefense.managers.WaveManager
 import fr.mesabloo.heavymachdefense.managers.animationManager
+import fr.mesabloo.heavymachdefense.managers.backgroundMusicManager
 import fr.mesabloo.heavymachdefense.ifDev
 import fr.mesabloo.heavymachdefense.managers.assets.StageAssetsManager
 import fr.mesabloo.heavymachdefense.managers.assets.assetManager
@@ -129,6 +131,10 @@ class StageScreen(
 
     private lateinit var systemMenu: SystemMenu
 
+    private val bgm = backgroundMusicManager.load(BackgroundMusicManager.GAMEPLAY).also {
+        it.isLooping = true
+        it.volume = 0f
+    }
     private var backgroundMusicVolume: Float = 1.0f
     private var effectsVolume: Float = 1.0f
 
@@ -163,6 +169,9 @@ class StageScreen(
 
         if (this.isLoading)
             return
+
+        this.bgm.volume = this.backgroundMusicVolume
+        this.bgm.play()
 
         this.systemMenu = SystemMenu(this::backgroundMusicVolume, this::effectsVolume, this)
 
@@ -470,6 +479,9 @@ class StageScreen(
                 )
             }
 
+            // Weapon fire sound (random variation)
+            stageAssetsManager.randomWeaponSound(kind).play(this.effectsVolume)
+
             // Smoke trail for missile/shell type bullets
             val smokeTrail = when (kind) {
                 MachineKind.MISSILE, MachineKind.HEAVY_MISSILE ->
@@ -483,7 +495,10 @@ class StageScreen(
                 { target.isAlive },
                 { hitPos ->
                     when (target) {
-                        is EnemyTankEntity -> target.tank.hp -= damage
+                        is EnemyTankEntity -> {
+                            target.tank.hp -= damage
+                            stageAssetsManager.randomBodyHitSound().play(this.effectsVolume)
+                        }
                         is BaseEntity -> target.hp -= damage
                     }
                     spawnEffect(hitEffect, hitPos)
@@ -585,6 +600,10 @@ class StageScreen(
             val shooterEntity = shooter as EnemyTankEntity
             val damage = shooterEntity.tank.attackDamage
             val bulletRegion = stageAssetsManager.unsafeRegion(StageAssetsManager.ENEMY_BULLETS, "00")
+
+            // Enemy tank fire sound
+            stageAssetsManager.sound(StageAssetsManager.SOUND_ENEMY_FIRE).play(this.effectsVolume)
+
             val bullet = Bullet(
                 bulletRegion, shooterPos, targetPos, 300f,
                 damage,
@@ -605,6 +624,9 @@ class StageScreen(
 
     override fun render(delta: Float) {
         this.menuTweenManager.update(delta)
+
+        // Sync BGM volume with slider
+        this.bgm.volume = this.backgroundMusicVolume
 
         // update cell storage capacity
         this.maxCells =
@@ -663,11 +685,13 @@ class StageScreen(
                                 else -> "explode-npc"
                             }
                             spawnEffect(deathEffect, deathPos)
+                            stageAssetsManager.sound(StageAssetsManager.SOUND_MACH_EXPLOSION).play(this.effectsVolume)
                         }
                         is EnemyTankEntity -> {
                             this.gameWorld.world.destroyBody(obj.body)
                             obj.tank.remove()
                             spawnEffect("explode-npc", deathPos)
+                            stageAssetsManager.sound(StageAssetsManager.SOUND_GROUND_EXPLOSION).play(this.effectsVolume)
                         }
                     }
                     true
@@ -744,6 +768,8 @@ class StageScreen(
 
     override fun dispose() {
         super.dispose()
+
+        this.bgm.stop()
 
         this.gameResultOverlay?.dispose()
         this.gameWorld.dispose()

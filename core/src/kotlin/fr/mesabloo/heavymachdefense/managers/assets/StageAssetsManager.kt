@@ -1,9 +1,11 @@
 package fr.mesabloo.heavymachdefense.managers.assets
 
+import com.badlogic.gdx.audio.Sound
 import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.g2d.TextureAtlas
 import com.badlogic.gdx.graphics.g2d.TextureRegion
 import com.badlogic.gdx.utils.Disposable
+import fr.mesabloo.heavymachdefense.data.MachineKind
 import fr.mesabloo.heavymachdefense.data.UpgradeKind
 import fr.mesabloo.heavymachdefense.data.getBackgroundForLevel
 import ktx.assets.load
@@ -40,6 +42,26 @@ class StageAssetsManager : Disposable {
         const val ENEMY_BULLETS = "gfx/models/bullets/enemy-bullet.atlas"
 
         const val EFFECTS = "gfx/models/effects/effects.atlas"
+
+        val WEAPON_SOUNDS: Map<MachineKind, List<String>> = mapOf(
+            MachineKind.RIFLE to (1..10).map { "sfx/machine/rifle/%02d.wav".format(it) },
+            MachineKind.HMG to (1..10).map { "sfx/machine/hmg/%02d.wav".format(it) },
+            MachineKind.MISSILE to (1..10).map { "sfx/machine/missile/%02d.wav".format(it) },
+            MachineKind.PLASMA to (1..5).map { "sfx/machine/plasma/%02d.wav".format(it) },
+            MachineKind.ION to (1..3).map { "sfx/machine/ion/%02d.wav".format(it) },
+            MachineKind.SHOTGUN to (1..3).map { "sfx/machine/shotgun/%02d.wav".format(it) },
+            MachineKind.HEAVY_MISSILE to listOf("sfx/weapon/missile.wav"),
+            MachineKind.TANKER to listOf("sfx/weapon/cannon.wav")
+        )
+
+        private val ALL_WEAPON_SOUND_PATHS = WEAPON_SOUNDS.values.flatten().distinct()
+
+        const val SOUND_ENEMY_FIRE = "sfx/weapon/gun.wav"
+        const val SOUND_GROUND_EXPLOSION = "sfx/effects/ground-explosion.wav"
+        const val SOUND_MACH_EXPLOSION = "sfx/effects/mach-explosion.wav"
+        val SOUND_BODY_HITS: List<String> = (1..4).map { "sfx/effects/body-hit-%02d.wav".format(it) }
+
+        private val ALL_COMBAT_SOUND_PATHS = listOf(SOUND_ENEMY_FIRE, SOUND_GROUND_EXPLOSION, SOUND_MACH_EXPLOSION) + SOUND_BODY_HITS
 
         const val ALLY_BASE = "gfx/models/base/ally-base.atlas"
         const val ENEMY_BASE = "gfx/models/base/enemy-base.atlas"
@@ -180,12 +202,16 @@ class StageAssetsManager : Disposable {
 
         this.allTextures().forEach { assetManager.load<Texture>(it) }
         this.allAtlases().forEach { assetManager.load<TextureAtlas>(it) }
+        ALL_WEAPON_SOUND_PATHS.forEach { assetManager.load<Sound>(it) }
+        ALL_COMBAT_SOUND_PATHS.forEach { assetManager.load<Sound>(it) }
     }
 
     fun isFullyLoaded(): Boolean =
         this.stageLevel != null
                 && this.allTextures().all { assetManager.isLoaded(it) }
                 && this.allAtlases().all { assetManager.isLoaded(it) }
+                && ALL_WEAPON_SOUND_PATHS.all { assetManager.isLoaded(it) }
+                && ALL_COMBAT_SOUND_PATHS.all { assetManager.isLoaded(it) }
 
     fun get(path: String): TextureRegion = TextureRegion(assetManager.get<Texture>(path))
 
@@ -195,12 +221,28 @@ class StageAssetsManager : Disposable {
     fun safeRegion(path: String, regionName: String): TextureRegion? =
         assetManager.get<TextureAtlas>(path).findRegion(regionName)
 
+    fun randomWeaponSound(kind: MachineKind): Sound {
+        val paths = WEAPON_SOUNDS[kind]!!
+        val path = paths.random()
+        return assetManager.get(path)
+    }
+
+    fun sound(path: String): Sound = assetManager.get(path)
+
+    fun randomBodyHitSound(): Sound = assetManager.get(SOUND_BODY_HITS.random())
+
     override fun dispose() {
         if (this.stageLevel != null) {
             val (bg1, bg2) = backgrounds(this.stageLevel!!)
 
             assetManager.unload(bg1)
             assetManager.unload(bg2)
+        }
+        ALL_WEAPON_SOUND_PATHS.forEach {
+            if (assetManager.isLoaded(it)) assetManager.unload(it)
+        }
+        ALL_COMBAT_SOUND_PATHS.forEach {
+            if (assetManager.isLoaded(it)) assetManager.unload(it)
         }
     }
 

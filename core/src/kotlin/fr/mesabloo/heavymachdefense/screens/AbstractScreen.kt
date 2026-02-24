@@ -21,6 +21,8 @@ import fr.mesabloo.heavymachdefense.tweens.ActorAccessor.Companion.POSITION
 import fr.mesabloo.heavymachdefense.tweens.ActorAccessor.Companion.SCALE
 import fr.mesabloo.heavymachdefense.managers.assets.debugAssetsManager
 import fr.mesabloo.heavymachdefense.ui.debug.DebugInfo
+import fr.mesabloo.heavymachdefense.managers.assets.LoadingAssetsManager
+import fr.mesabloo.heavymachdefense.managers.assets.loadingAssetsManager
 import fr.mesabloo.heavymachdefense.ui.loading.*
 import fr.mesabloo.heavymachdefense.world.UIWorld
 import fr.mesabloo.heavymachdefense.world.UI_HEIGHT
@@ -155,6 +157,8 @@ abstract class AbstractScreen(val game: MainGame, isLoading: Boolean = false) : 
             .repeat(-1, 0.1f)
             .start(this.tweenManager)
 
+        loadingAssetsManager.sound(LoadingAssetsManager.SOUND_DOOR_CLOSE).play()
+
         val tweens = mutableListOf<Tween>()
 
         this.foreground.addActor(LeftPane().also {
@@ -211,6 +215,8 @@ abstract class AbstractScreen(val game: MainGame, isLoading: Boolean = false) : 
 
     fun addLoadingOverlayEnd() {
         this.isLoading = true
+
+        loadingAssetsManager.sound(LoadingAssetsManager.SOUND_DOOR_OPEN).play()
 
         val tweens = mutableListOf<Tween>()
 

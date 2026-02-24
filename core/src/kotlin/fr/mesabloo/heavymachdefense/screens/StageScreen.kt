@@ -27,6 +27,7 @@ import fr.mesabloo.heavymachdefense.data.Specials
 import fr.mesabloo.heavymachdefense.listeners.stage.*
 import fr.mesabloo.heavymachdefense.managers.WaveManager
 import fr.mesabloo.heavymachdefense.managers.animationManager
+import fr.mesabloo.heavymachdefense.ifDev
 import fr.mesabloo.heavymachdefense.managers.assets.StageAssetsManager
 import fr.mesabloo.heavymachdefense.managers.assets.assetManager
 import fr.mesabloo.heavymachdefense.managers.assets.stageAssetsManager
@@ -219,6 +220,10 @@ class StageScreen(
 
         this.background.addActor(Group().also {
             this.machineSlots = it
+
+            ifDev {
+                this.save.buildSlots = MachineKind.values().map { MachineSlot(it) }.toMutableList()
+            }
 
             var currentY = SLOT_MENU_HEIGHT - 76f
             for (slot in this.save.buildSlots) {

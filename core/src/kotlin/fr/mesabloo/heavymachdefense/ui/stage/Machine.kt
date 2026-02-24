@@ -38,12 +38,7 @@ class Machine(kind: MachineKind, level: Int) : Group() {
 
         val body =
             Image(stageAssetsManager.unsafeRegion(StageAssetsManager.MACHINE_BODIES, "${kind.machineName}-$oLevel"))
-        val weapon1 =
-            Image(stageAssetsManager.unsafeRegion(StageAssetsManager.MACHINE_WEAPONS, "${kind.machineName}-$oLevel"))
-        val weapon2 = Image(
-            TextureRegion(stageAssetsManager.unsafeRegion(StageAssetsManager.MACHINE_WEAPONS, "${kind.machineName}-$oLevel")).also {
-                it.flip(false, true)
-            })
+        val weaponRegion = stageAssetsManager.safeRegion(StageAssetsManager.MACHINE_WEAPONS, "${kind.machineName}-$oLevel")
 
         this.width = body.width
         this.height = body.height
@@ -79,21 +74,26 @@ class Machine(kind: MachineKind, level: Int) : Group() {
             it.setPosition(0f, 0f)
         })
 
-        // Weapons (drawn on top of body)
-        this.addActor(weapon1.also {
-            it.setPosition(
-                body.width / 2f + model.leftWeaponOffset.first - it.width / 2f,
-                body.height / 2f + model.leftWeaponOffset.second - it.height / 2f
-            )
-            it.zIndex = 5000
-        })
-        this.addActor(weapon2.also {
-            it.setPosition(
-                body.width / 2f + model.rightWeaponOffset.first - it.width / 2f,
-                body.height / 2f + model.rightWeaponOffset.second - it.height / 2f
-            )
-            it.zIndex = 5000
-        })
+        // Weapons (drawn on top of body, skipped if no weapon region in atlas)
+        if (weaponRegion != null) {
+            val weapon1 = Image(weaponRegion)
+            val weapon2 = Image(TextureRegion(weaponRegion).also { it.flip(false, true) })
+
+            this.addActor(weapon1.also {
+                it.setPosition(
+                    body.width / 2f + model.leftWeaponOffset.first - it.width / 2f,
+                    body.height / 2f + model.leftWeaponOffset.second - it.height / 2f
+                )
+                it.zIndex = 5000
+            })
+            this.addActor(weapon2.also {
+                it.setPosition(
+                    body.width / 2f + model.rightWeaponOffset.first - it.width / 2f,
+                    body.height / 2f + model.rightWeaponOffset.second - it.height / 2f
+                )
+                it.zIndex = 5000
+            })
+        }
     }
 
     /**

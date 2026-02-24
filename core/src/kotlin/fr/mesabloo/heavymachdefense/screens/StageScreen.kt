@@ -479,6 +479,9 @@ class StageScreen(
                 )
             }
 
+            // Weapon fire sound (random variation)
+            stageAssetsManager.randomWeaponSound(kind).play(this.effectsVolume)
+
             // Smoke trail for missile/shell type bullets
             val smokeTrail = when (kind) {
                 MachineKind.MISSILE, MachineKind.HEAVY_MISSILE ->

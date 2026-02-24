@@ -5,8 +5,13 @@ import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.ai.btree.utils.BehaviorTreeParser
 import com.badlogic.gdx.graphics.g2d.TextureAtlas
 import com.badlogic.gdx.math.Vector2
+import com.badlogic.gdx.math.Interpolation
+import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.scenes.scene2d.Group
 import com.badlogic.gdx.scenes.scene2d.Touchable
+import com.badlogic.gdx.scenes.scene2d.Action
+import com.badlogic.gdx.scenes.scene2d.actions.Actions
+import com.badlogic.gdx.scenes.scene2d.ui.Image
 import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane
 import com.badlogic.gdx.physics.box2d.BodyDef
 import com.badlogic.gdx.utils.Timer
@@ -239,6 +244,7 @@ class StageScreen(
 
             ifDev {
                 this.save.buildSlots = MachineKind.values().map { MachineSlot(it) }.toMutableList()
+                SpecialKind.values().forEach { kind -> this.save.specialCount[kind] = 99 }
             }
 
             val slotCount = this.save.buildSlots.size
@@ -299,9 +305,11 @@ class StageScreen(
                 it.addActor(when (slot) {
                     is SpecialSlot -> SpecialBuildSlot(slot, this.save, this.specials)
                     else -> TODO()
-                }.also {
-                    it.setPosition(40f, currentY)
-
+                }.also { buildSlot ->
+                    buildSlot.setPosition(40f, currentY)
+                    buildSlot.addListener(UseSpecialAttack(buildSlot, this::upgradeMenuShown) { slot ->
+                        executeSpecialAttack(slot.kind)
+                    })
                 })
 
                 currentY -= 102f
@@ -556,14 +564,403 @@ class StageScreen(
         return bestX.coerceIn(SPAWN_X_MIN + halfW, SPAWN_X_MAX - halfW)
     }
 
-    private fun spawnEffect(effectName: String, pixelPos: Vector2) {
+    private fun spawnEffect(effectName: String, pixelPos: Vector2, additive: Boolean = false) {
         val atlas = assetManager.get<TextureAtlas>(StageAssetsManager.EFFECTS)
         val regions = atlas.findRegions(effectName)
         if (regions.size == 0) return
-        val effect = ExplosionEffect(regions)
+        val effect = ExplosionEffect(regions, additive = additive)
         effect.setPosition(pixelPos.x - effect.width / 2f, pixelPos.y - effect.height / 2f)
         this.terrain.addActor(effect)
     }
+
+    private fun spawnPlaneFlyover(
+        targetX: Float, targetY: Float,
+        onDrop: ((planeX: Float, planeY: Float) -> Unit)? = null
+    ) {
+        val planeRegion = stageAssetsManager.get(StageAssetsManager.ALLY_PLANE)
+        val plane = Image(planeRegion)
+
+        // ~1/4 of terrain width (512/4=128), plane.png=256 → scale 0.5
+        val scale = 0.5f
+        plane.setSize(plane.width * scale, plane.height * scale)
+        plane.setOrigin(plane.width / 2f, plane.height / 2f)
+
+        // Start below screen with slight X offset for diagonal approach
+        val offsetX = (-80..80).random().toFloat()
+        val startX = targetX + offsetX
+        val startY = -plane.height
+
+        // Flight direction: toward target, always upward
+        val dirX = targetX - startX
+        val dirY = (targetY - startY).coerceAtLeast(1f)
+        val dirLen = Vector2(dirX, dirY).len()
+        val normX = dirX / dirLen
+        val normY = dirY / dirLen
+
+        // Rotate nose toward target (sprite faces right by default)
+        val flightAngle = MathUtils.atan2(dirY, dirX) * MathUtils.radiansToDegrees
+        plane.rotation = flightAngle
+
+        // End: continue same direction until well above terrain
+        val exitY = 2048f + plane.height * 2
+        val tToExit = (exitY - startY) / normY
+        val endX = startX + normX * tToExit
+
+        plane.setPosition(startX - plane.width / 2f, startY)
+
+        val moveAction = Actions.sequence(
+            Actions.moveTo(endX - plane.width / 2f, exitY, 5.0f, Interpolation.pow3In),
+            Actions.removeActor()
+        )
+
+        if (onDrop != null) {
+            val dropY = (targetY - 700f).coerceAtLeast(0f)
+            plane.addAction(Actions.parallel(
+                moveAction,
+                object : Action() {
+                    var dropped = false
+                    override fun act(delta: Float): Boolean {
+                        val planeCenter = actor.y + actor.height / 2f
+                        if (!dropped && planeCenter >= dropY) {
+                            dropped = true
+                            onDrop(actor.x + actor.width / 2f, planeCenter)
+                        }
+                        return dropped
+                    }
+                }
+            ))
+        } else {
+            plane.addAction(moveAction)
+        }
+
+        terrain.addActor(plane)
+    }
+
+    // ======================== Special Attacks ========================
+
+    private fun executeSpecialAttack(kind: SpecialKind) {
+        if (gameEnded) return
+        val count = this.save.specialCount[kind] ?: 0
+        if (count <= 0) return
+        this.save.specialCount[kind] = count - 1
+
+        val maxLevel = when (kind) {
+            SpecialKind.AIRSTRIKE_BOMB -> specials.airstrikeBomb.size
+            SpecialKind.AIRSTRIKE_MISSILE -> specials.airstrikeMissile.size
+            SpecialKind.AIRSTRIKE_NUKE -> specials.airstrikeNuke.size
+            SpecialKind.AIRSTRIKE_EMP -> specials.airstrikeEMP.size
+            SpecialKind.CROSSFIRE_MISSILE -> specials.crossfireMissile.size
+        }
+        val level = (this.save.specialUpgrades[kind] ?: 1).coerceIn(1..maxLevel)
+        val idx = level - 1
+
+        stageAssetsManager.playUiSound(StageAssetsManager.SOUND_AIRSTRIKE)
+
+        when (kind) {
+            SpecialKind.AIRSTRIKE_BOMB -> executeAirstrikeBomb(specials.airstrikeBomb[idx])
+            SpecialKind.AIRSTRIKE_MISSILE -> executeAirstrikeMissile(specials.airstrikeMissile[idx])
+            SpecialKind.AIRSTRIKE_NUKE -> executeAirstrikeNuke(specials.airstrikeNuke[idx])
+            SpecialKind.AIRSTRIKE_EMP -> executeAirstrikeEMP(specials.airstrikeEMP[idx])
+            SpecialKind.CROSSFIRE_MISSILE -> executeCrossfireMissile(specials.crossfireMissile[idx])
+        }
+    }
+
+    private fun executeAirstrikeBomb(info: AirstrikeBombInfo) {
+        val damage = info.unitDamage
+        val enemies = gameObjects.filterIsInstance<EnemyTankEntity>().filter { it.isAlive }
+        val flyoverX: Float
+        val flyoverY: Float
+        if (enemies.isNotEmpty()) {
+            val ref = enemies.random()
+            flyoverX = ref.getPosition().x * PPM
+            flyoverY = ref.getPosition().y * PPM
+        } else {
+            flyoverX = 256f; flyoverY = 1000f
+        }
+
+        spawnPlaneFlyover(flyoverX, flyoverY) { planeX, planeY ->
+            val bulletRegion = stageAssetsManager.unsafeRegion(StageAssetsManager.SHELL_BULLETS, "01")
+            val smokeTrail = assetManager.get<TextureAtlas>(StageAssetsManager.EFFECTS).findRegions("smoke")
+
+            for (i in 0 until info.bombCount) {
+                Timer.schedule(object : Timer.Task() {
+                    override fun run() {
+                        if (gameEnded) return
+                        val alive = gameObjects.filterIsInstance<EnemyTankEntity>().filter { it.isAlive }
+                        val targetPos: Vector2
+                        val targetEntity: EnemyTankEntity?
+                        if (alive.isNotEmpty()) {
+                            targetEntity = alive.random()
+                            targetPos = targetEntity.getPosition().cpy().scl(PPM)
+                            targetPos.x += (-20..20).random()
+                            targetPos.y += (-20..20).random()
+                        } else {
+                            targetEntity = null
+                            targetPos = Vector2((50..460).random().toFloat(), (200..1800).random().toFloat())
+                        }
+
+                        val arcDir = if (i % 2 == 0) 1f else -1f
+                        val arcAmount = (40f + (0..20).random()) * arcDir
+
+                        val bullet = Bullet(
+                            bulletRegion,
+                            Vector2(planeX, planeY),
+                            targetPos,
+                            450f,
+                            damage,
+                            { targetEntity?.isAlive ?: false },
+                            { hitPos ->
+                                targetEntity?.let { it.tank.hp -= damage }
+                                spawnEffect("explode-ground", hitPos)
+                                stageAssetsManager.randomSpecialImpactSound().play(effectsVolume)
+                            },
+                            {
+                                spawnEffect("explode-ground", targetPos)
+                                stageAssetsManager.randomSpecialImpactSound().play(effectsVolume)
+                            },
+                            trailRegions = smokeTrail,
+                            arcHeight = arcAmount
+                        )
+                        terrain.addActor(bullet)
+                        stageAssetsManager.sound("sfx/weapon/missile.wav").play(effectsVolume * 0.7f)
+                    }
+                }, i * 0.08f)
+            }
+        }
+    }
+
+    private fun executeAirstrikeMissile(info: AirstrikeMissileInfo) {
+        val damage = info.unitDamage
+        val enemies = gameObjects.filterIsInstance<EnemyTankEntity>().filter { it.isAlive }
+        val flyoverX: Float
+        val flyoverY: Float
+        if (enemies.isNotEmpty()) {
+            val ref = enemies.random()
+            flyoverX = ref.getPosition().x * PPM
+            flyoverY = ref.getPosition().y * PPM
+        } else {
+            flyoverX = 256f; flyoverY = 1000f
+        }
+
+        spawnPlaneFlyover(flyoverX, flyoverY) { planeX, planeY ->
+            val bulletRegion = stageAssetsManager.unsafeRegion(StageAssetsManager.SHELL_BULLETS, "00")
+            val smokeTrail = assetManager.get<TextureAtlas>(StageAssetsManager.EFFECTS).findRegions("smoke")
+
+            for (i in 0 until info.bombCount) {
+                Timer.schedule(object : Timer.Task() {
+                    override fun run() {
+                        if (gameEnded) return
+                        val alive = gameObjects.filterIsInstance<EnemyTankEntity>().filter { it.isAlive }
+                        val targetPos: Vector2
+                        val targetEntity: EnemyTankEntity?
+                        if (alive.isNotEmpty()) {
+                            targetEntity = alive.random()
+                            targetPos = targetEntity.getPosition().cpy().scl(PPM)
+                            targetPos.x += (-15..15).random()
+                            targetPos.y += (-15..15).random()
+                        } else {
+                            targetEntity = null
+                            targetPos = Vector2((50..460).random().toFloat(), (200..1800).random().toFloat())
+                        }
+
+                        val arcDir = if (i % 2 == 0) 1f else -1f
+                        val arcAmount = (60f + (0..20).random()) * arcDir
+
+                        val bullet = Bullet(
+                            bulletRegion,
+                            Vector2(planeX, planeY),
+                            targetPos,
+                            500f,
+                            damage,
+                            { targetEntity?.isAlive ?: false },
+                            { hitPos ->
+                                targetEntity?.let { it.tank.hp -= damage }
+                                spawnEffect("explode-02", hitPos)
+                                stageAssetsManager.randomSpecialImpactSound().play(effectsVolume)
+                            },
+                            {
+                                spawnEffect("explode-02", targetPos)
+                                stageAssetsManager.randomSpecialImpactSound().play(effectsVolume)
+                            },
+                            trailRegions = smokeTrail,
+                            arcHeight = arcAmount
+                        )
+                        terrain.addActor(bullet)
+                        stageAssetsManager.sound("sfx/weapon/missile.wav").play(effectsVolume * 0.7f)
+                    }
+                }, i * 0.1f)
+            }
+        }
+    }
+
+    private fun executeAirstrikeNuke(info: AirstrikeNukeInfo) {
+        val damage = info.unitDamage
+        val rangeWorld = info.range.toFloat() / PPM
+
+        val enemies = gameObjects.filterIsInstance<EnemyTankEntity>().filter { it.isAlive }
+        val centerPixel: Vector2
+        val avgX: Float
+        val avgY: Float
+        if (enemies.isNotEmpty()) {
+            avgX = enemies.map { it.getPosition().x }.average().toFloat()
+            avgY = enemies.map { it.getPosition().y }.average().toFloat()
+            centerPixel = Vector2(avgX * PPM, avgY * PPM)
+        } else {
+            centerPixel = Vector2(256f, 1000f)
+            avgX = centerPixel.x / PPM
+            avgY = centerPixel.y / PPM
+        }
+
+        spawnPlaneFlyover(centerPixel.x, centerPixel.y) { planeX, planeY ->
+            val bulletRegion = stageAssetsManager.unsafeRegion(StageAssetsManager.SHELL_BULLETS, "01")
+            val smokeTrail = assetManager.get<TextureAtlas>(StageAssetsManager.EFFECTS).findRegions("smoke")
+
+            val bullet = Bullet(
+                bulletRegion,
+                Vector2(planeX, planeY),
+                centerPixel.cpy(),
+                350f,
+                damage,
+                { true },
+                { hitPos ->
+                    val targets = gameObjects.filterIsInstance<EnemyTankEntity>().filter {
+                        it.isAlive && it.getPosition().dst(avgX, avgY) <= rangeWorld
+                    }
+                    for (target in targets) {
+                        target.tank.hp -= damage
+                    }
+                    spawnEffect("explode-boss", hitPos, additive = true)
+                    for (j in 0 until 5) {
+                        val offset = Vector2(
+                            hitPos.x + (-60..60).random(),
+                            hitPos.y + (-60..60).random()
+                        )
+                        Timer.schedule(object : Timer.Task() {
+                            override fun run() {
+                                if (gameEnded) return
+                                spawnEffect("explode-ground", offset)
+                                stageAssetsManager.randomSpecialImpactSound().play(effectsVolume)
+                            }
+                        }, j * 0.08f)
+                    }
+                    stageAssetsManager.sound(StageAssetsManager.SOUND_GROUND_EXPLOSION).play(effectsVolume)
+                },
+                {},
+                trailRegions = smokeTrail,
+                arcHeight = 0f
+            )
+            terrain.addActor(bullet)
+            stageAssetsManager.sound("sfx/weapon/missile.wav").play(effectsVolume * 0.7f)
+        }
+    }
+
+    private fun executeAirstrikeEMP(info: AirStrikeEMPInfo) {
+        val damage = info.unitDamage
+        val rangeWorld = info.range.toFloat() / PPM
+        val paralysisTime = info.paralysisTime.toFloat()
+
+        val enemies = gameObjects.filterIsInstance<EnemyTankEntity>().filter { it.isAlive }
+        val avgX: Float
+        val avgY: Float
+        if (enemies.isNotEmpty()) {
+            avgX = enemies.map { it.getPosition().x }.average().toFloat()
+            avgY = enemies.map { it.getPosition().y }.average().toFloat()
+        } else {
+            avgX = 256f / PPM
+            avgY = 1000f / PPM
+        }
+
+        val targetPixel = Vector2(avgX * PPM, avgY * PPM)
+
+        spawnPlaneFlyover(targetPixel.x, targetPixel.y) { planeX, planeY ->
+            val bulletRegion = stageAssetsManager.unsafeRegion(StageAssetsManager.SHELL_BULLETS, "00")
+            val smokeTrail = assetManager.get<TextureAtlas>(StageAssetsManager.EFFECTS).findRegions("smoke")
+
+            val bullet = Bullet(
+                bulletRegion,
+                Vector2(planeX, planeY),
+                targetPixel.cpy(),
+                500f,
+                damage,
+                { true },
+                { hitPos ->
+                    val targets = gameObjects.filterIsInstance<EnemyTankEntity>().filter {
+                        it.isAlive && it.getPosition().dst(avgX, avgY) <= rangeWorld
+                    }
+                    for (target in targets) {
+                        target.tank.hp -= damage
+                        target.paralyzedTimer = paralysisTime
+                        target.stopInPlace()
+                        val pos = target.getPosition().cpy().scl(PPM)
+                        spawnEffect("lightning", pos)
+                    }
+                    spawnEffect("lightning", hitPos)
+                    stageAssetsManager.randomSpecialImpactSound().play(effectsVolume)
+                },
+                {},
+                trailRegions = smokeTrail,
+                arcHeight = 0f
+            )
+            terrain.addActor(bullet)
+            stageAssetsManager.sound("sfx/weapon/missile.wav").play(effectsVolume * 0.7f)
+        }
+    }
+
+    private fun executeCrossfireMissile(info: CrossfireMissileInfo) {
+        val damage = info.unitDamage
+        val machines = gameObjects.filterIsInstance<MachineEntity>().filter { it.isAlive }
+        if (machines.isEmpty()) return
+
+        val misslesPerMachine = 4
+        var delay = 0f
+
+        for (machine in machines) {
+            val startPos = machine.getPosition().cpy().scl(PPM)
+
+            for (j in 0 until misslesPerMachine) {
+                Timer.schedule(object : Timer.Task() {
+                    override fun run() {
+                        if (gameEnded) return
+                        val enemies = gameObjects.filterIsInstance<EnemyTankEntity>().filter { it.isAlive }
+                        if (enemies.isEmpty()) return
+                        val target = enemies.random()
+                        val targetPos = target.getPosition().cpy().scl(PPM)
+                        targetPos.x += (-15..15).random()
+                        targetPos.y += (-15..15).random()
+
+                        val bulletRegion = stageAssetsManager.unsafeRegion(StageAssetsManager.SHELL_BULLETS, "00")
+                        val smokeTrail = assetManager.get<TextureAtlas>(StageAssetsManager.EFFECTS).findRegions("smoke")
+
+                        // Alternate arc direction: odd missiles curve left, even curve right
+                        val arcDir = if (j % 2 == 0) 1f else -1f
+                        val arcAmount = (80f + (0..40).random()) * arcDir
+
+                        val bullet = Bullet(
+                            bulletRegion, startPos.cpy(), targetPos, 350f,
+                            damage,
+                            { target.isAlive },
+                            { hitPos ->
+                                target.tank.hp -= damage
+                                spawnEffect("explode-01", hitPos)
+                                stageAssetsManager.randomSpecialImpactSound().play(effectsVolume)
+                            },
+                            {
+                                spawnEffect("explode-01", targetPos)
+                                stageAssetsManager.randomSpecialImpactSound().play(effectsVolume)
+                            },
+                            trailRegions = smokeTrail,
+                            arcHeight = arcAmount
+                        )
+                        terrain.addActor(bullet)
+                        stageAssetsManager.sound("sfx/weapon/missile.wav").play(effectsVolume * 0.7f)
+                    }
+                }, delay)
+                delay += 0.1f
+            }
+        }
+    }
+
+    // ======================== Enemy Spawning ========================
 
     private fun spawnEnemyTank(info: EnemySpawnInfo) {
         if (gameEnded) return
@@ -673,6 +1070,12 @@ class StageScreen(
             for (obj in this.gameObjects.toList()) {
                 if (obj.isAlive) {
                     obj.shootCooldownRemaining = (obj.shootCooldownRemaining - delta).coerceAtLeast(0f)
+                    // EMP paralysis: skip btree step while frozen
+                    if (obj is EnemyTankEntity && obj.paralyzedTimer > 0f) {
+                        obj.paralyzedTimer -= delta
+                        obj.body.setLinearVelocity(0f, 0f)
+                        continue
+                    }
                     obj.behaviorTree?.step()
                 }
             }

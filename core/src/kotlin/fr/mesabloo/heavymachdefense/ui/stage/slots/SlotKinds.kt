@@ -172,6 +172,8 @@ class SpecialBuildSlot(
     private val save: GameSave,
     private val specials: Specials
 ) : Group() {
+    val kind: SpecialKind = slot.kind
+
     private val counter: Label
 
     var isDisabled: Boolean = false
@@ -253,7 +255,10 @@ class SpecialBuildSlot(
     }
 
     override fun act(delta: Float) {
-        this.isDisabled = this.counter.textEquals("0")
+        val currentCount = this.save.specialCount[this.slot.kind] ?: 0
+        this.counter.setText("$currentCount")
+
+        this.isDisabled = currentCount <= 0
         this.cover.zIndex = if (this.isDisabled) 50000000 else 0
 
         this.updateSlot()

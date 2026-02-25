@@ -26,11 +26,11 @@ JAVA_HOME: `~/Library/Java/JavaVirtualMachines/jbr-17.0.14/Contents/Home`
 
 ## Tech Stack
 
-- **LibGDX 1.13.1** + LibKTX 1.13.1-rc1
-- **Kotlin 2.1.0**, kotlinx.serialization 1.7.3
+- **LibGDX 1.13.1** + LibKTX 1.13.1-rc1 (원본: 1.10.0, 포크 시 마이그레이션)
+- **Kotlin 2.1.0**, kotlinx.serialization 1.7.3 (원본: Kotlin 1.6.0)
 - **Box2D** (물리), **Scene2D** (UI/렌더링), **gdx-ai 1.8.2** (행동 트리)
 - Universal Tween Engine 6.3.3
-- Desktop: LWJGL3 backend, 768×1024, 60fps
+- Desktop: LWJGL3 backend, 768×1024, 60fps (원본: LWJGL2, 포크 시 마이그레이션)
 
 ## Project Structure
 

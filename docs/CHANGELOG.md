@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-02-25 — 웨이브 번호 UI 표시
+
+- 전투 중 현재 웨이브 번호 표시 (WAVE n / total)
+- WaveManager에 currentWave/totalWaves public getter 추가
+- WaveCounter UI 컴포넌트 신규 생성
+
 ## 2026-02-25 — 문서화
 
 - CLAUDE.md 프로젝트 가이드 생성 (빌드, 구조, 아키텍처, 컨벤션)

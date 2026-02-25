@@ -150,6 +150,7 @@ StartScreen → SavesSelectionScreen → StageSelectionScreen → StageScreen
 ## TODO (미해결/진행중)
 
 - [ ] 미사일 투사체 트레일 이펙트 (하얀 굵은 실/연기) — 시도 2회 롤백, 방법 미정
+- [ ] 창 리사이즈 시 UI 깨짐 — 머신 빌드 탭 아이콘/버튼 위치 어긋남. FitViewport 리사이즈 처리 문제. 모바일 빌드 시에도 영향 예상
 
 ## Notes
 

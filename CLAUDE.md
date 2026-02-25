@@ -151,6 +151,7 @@ StartScreen → SavesSelectionScreen → StageSelectionScreen → StageScreen
 
 - [ ] 미사일 투사체 트레일 이펙트 (하얀 굵은 실/연기) — 시도 2회 롤백, 방법 미정
 - [ ] 창 리사이즈 시 UI 깨짐 — 머신 빌드 탭 아이콘/버튼 위치 어긋남. FitViewport 리사이즈 처리 문제. 모바일 빌드 시에도 영향 예상
+- [ ] 유닛 충돌/이동 우회 — 현재 유닛 간 겹침 허용, 런타임 충돌 회피 없음. Steerable 인터페이스는 구현돼 있으나 스티어링 행동 미연결. 스폰 시 겹침 방지(findNonOverlappingSpawnX)만 존재
 
 ## Notes
 

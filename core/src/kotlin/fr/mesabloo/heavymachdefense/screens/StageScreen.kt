@@ -412,6 +412,10 @@ class StageScreen(
         } else {
             this.waveManager = WaveManager(generateDefaultWaves(level)) { info -> spawnEnemyTank(info) }
         }
+
+        this.background.addActor(WaveCounter(this.waveManager).also {
+            it.setPosition(142f - it.width / 2f, 57f)
+        })
     }
 
     private fun spawnMachine(kind: MachineKind, level: Int) {

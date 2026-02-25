@@ -7,6 +7,9 @@ class WaveManager(
     private val levelWaves: LevelWaves,
     private val spawnCallback: (EnemySpawnInfo) -> Unit
 ) {
+    val currentWave: Int get() = currentWaveIndex + 1
+    val totalWaves: Int get() = levelWaves.waves.size
+
     private var elapsed = 0f
     private var currentWaveIndex = 0
     private var groupTrackers: List<GroupTracker>? = null

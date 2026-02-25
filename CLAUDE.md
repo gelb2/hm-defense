@@ -143,6 +143,9 @@ StartScreen → SavesSelectionScreen → StageSelectionScreen → StageScreen
 - 사운드: `randomSpecialImpactSound()` 등 랜덤 풀 패턴
 - 세이브: `Preferences("hm-defense/saves")`
 - 굵직한 기능 구현 완료 시 `docs/RESTORATION.md`의 복원 진행 섹션에 반영할 것
+- 게임 메카닉 변경 시 `docs/Gameplay.md` 업데이트 (스탯, 유닛, 스킬 등)
+- 기능 구현/버그 수정 완료 시 `docs/CHANGELOG.md`에 항목 추가
+- 에셋 추가/변경 시 `docs/ASSETS.md` 업데이트
 
 ## TODO (미해결/진행중)
 

@@ -1,44 +1,212 @@
-"Heavy MACH: Defense" is a real-time turret defense style game with an additional objective:
-the enemy base must be destroyed before yours.
+# Gameplay — Heavy MACH: Defense
 
-## Basics
+실시간 터렛 디펜스 게임. 아군 기지를 방어하면서 적 기지를 파괴하는 것이 목표.
 
-The whole game happens in stages, where each stage is harder than the previous one.
-Each stage is composed of two bases (yours and the enemy one) on each side (top & bottom) of a rectangle, with predefined
-positions for some enemy turrets.
-The goal of each stage is to create machines and turrets to destroy the enemy base (who is able to do just the same to destroy yours).
+## 게임 흐름
 
-## The base
+```
+타이틀 → 세이브 선택 → 스테이지 선택 (1-80) → 전투
+```
 
-The base is the most important point of the game as it defines how one can win/lose.
+각 스테이지는 직사각형 전장(512×2048px) 위에 아군 기지(하단)와 적 기지(상단)가 배치된다.
+적은 웨이브 단위로 스폰되며, 모든 웨이브를 처리하고 적 기지를 파괴하면 승리.
+아군 기지 HP가 0이 되면 패배.
 
-The enemy base and the friendly base are very similar: both have an HP gauge and get destroyed if it goes to 0.
-However, the friendly base has quite a few additional perks:
-- it possesses weak weapons which can deal damage to incoming enemy turrets/machines
-- it can be upgraded at any point in the middle of a game (the enemy base has a fixed set of upgrades for each stage)
+## 기지 (Base)
 
-Here are all the available upgrades:
-- TODO
+아군/적 기지 모두 HP를 가지며, 0이 되면 파괴된다.
 
-## Machines
+- **초기 HP**: 500
+- 아군 기지는 자체 무기를 보유하여 접근하는 적을 공격
+- 아군 기지만 전투 중 업그레이드 가능 (적 기지는 스테이지별 고정)
 
-Machines are mobile units trying to attack the first enemy unit (might be their base) the see on the map.
-Each has specific characteristics such as:
-- HP
-- moving speed
-- attack damage
-- attack range
-- reload speed
+## 머신 (Machines) — 8종
 
-Each machine type also has the possibility to be upgraded, which mainly improve attack damage and HP.
-Some slight improvements on moving speed, reload speed and attack range may also be registered for some of them.
+아군 이동 유닛. 전방으로 걸어가며 사거리 내 첫 번째 적을 공격한다.
 
-## Turrets
+| 종류 | 설명 |
+|------|------|
+| **RIFLE** | 표준 보병. 저렴, 다수 배치 가능 |
+| **MISSILE** | 중거리 폭발형 |
+| **HEAVY_MISSILE** | 중화기 포병 |
+| **ION** | 에너지 기반 |
+| **HMG** | 고연사 중기관총 |
+| **PLASMA** | 플라즈마 기반 |
+| **SHOTGUN** | 근거리 산탄 |
+| **TANKER** | 탱크형 지원 |
 
-Turrets are fixed units with high health which also attack the first unit they see.
-However, because turrets are fixed, it is possible to completely block machines from going forwards by
-creating a wall of turrets without gaps.
-Every turret has the same set of characteristics as machines, as well as upgrades on them.
+### 머신 공통 속성
+- HP, 이동속도, 공격력, 사거리, 감지거리, 재장전 속도
+- 레벨업(1-10)으로 공격력, HP 등 상승
 
-## Special attacks
+### 머신 스탯 예시
 
+**RIFLE** (레벨 1 → 10):
+| | Lv.1 | Lv.10 |
+|--|------|-------|
+| 비용 | 60 | 500 |
+| 빌드시간 | 3.0s | 5.0s |
+| 최대배치 | 5 | 3 |
+| HP | 80 | 300 |
+| 공격력 | 8 | 35 |
+| 속도 | 1.2 | 1.2 |
+| 사거리 | 100 | 140 |
+| 감지거리 | 150 | 210 |
+
+**TANKER** (레벨 1 → 10):
+| | Lv.1 | Lv.10 |
+|--|------|-------|
+| 비용 | 200 | 640 |
+| 빌드시간 | 6.0s | 2.0s |
+| 최대배치 | 1 | 1 |
+| HP | 400 | 1280 |
+| 공격력 | 15 | 60 |
+| 속도 | 0.5 | 0.5 |
+| 사거리 | 80 | 120 |
+| 감지거리 | 130 | 190 |
+
+### 투사체 속성 (머신별)
+
+| 머신 | 투사체 속도 | 피격 이펙트 |
+|------|-----------|------------|
+| Rifle | 350 px/s | damage |
+| HMG | 400 px/s | damage-hmg |
+| Missile | 250 px/s | explode-01 |
+| Heavy Missile | 200 px/s | explode-02 |
+| ION | 450 px/s | explode-ion |
+| Plasma | 300 px/s | explode-plasma |
+| Shotgun | 380 px/s | — |
+| Tanker | 300 px/s | explode-01 |
+
+## 터렛 (Turrets) — 6종
+
+고정 방어 유닛. 높은 HP, 사거리 내 적 자동 공격.
+터렛을 빈틈없이 배치하면 적 진행을 물리적으로 차단할 수 있다.
+
+| 종류 | 레벨 |
+|------|------|
+| **RIFLE** | 1-5 |
+| **MISSILE** | 1-5 |
+| **VULCAN** | 1-5 |
+| **PLASMA** | 1-5 |
+| **ION** | 1-5 |
+| **LASER** | 1-5 |
+
+## 업그레이드 — 6종
+
+스테이지 간(세이브 화면) 또는 전투 중 적용 가능한 글로벌 업그레이드.
+
+| 종류 | 효과 | 범위 |
+|------|------|------|
+| **BASE_CANNON** | 기지 무기 강화 (재장전 2.5→1.9s, 탄수 10→24) | — |
+| **BASE_DEFENSE** | 기지 HP 증가 (10,000→100,000) | — |
+| **BUILD_TIME** | 빌드 시간 감소 (×1.0→×0.64) | — |
+| **CELL_STORAGE** | 셀 저장량 증가 (500→4,700) | — |
+| **CELL_RESEARCH** | 셀 수입 배율 (×1.0→×3.0) | — |
+| **CR_RESEARCH** | CR 수입 배율 (×1.0→×3.0) | — |
+
+## 슬롯 시스템
+
+- **빌드 슬롯** (최대 7개): 머신 또는 터렛 장착
+- **스페셜 슬롯** (5개 고정): 특수 공격 장착
+
+## 특수 공격 (Specials) — 5종
+
+소모성 스킬. 전투 중 사용하며, 비행기 플라이오버 → 투사체 발사 → 착탄 순서로 연출.
+
+### AIRSTRIKE_BOMB — 폭격
+
+다발 투사체. 비행기가 목표 상공에서 폭탄 투하.
+
+| Lv | 데미지 | 탄수 | 범위 |
+|----|--------|------|------|
+| 1 | 300 | 10 | 120 |
+| 2 | 400 | 11 | 130 |
+| 3 | 500 | 12 | 140 |
+| 4 | 600 | 13 | 150 |
+| 5 | 700 | 14 | 160 |
+
+### AIRSTRIKE_MISSILE — 미사일 공습
+
+다발 투사체. 폭격보다 높은 데미지와 넓은 범위.
+
+| Lv | 데미지 | 탄수 | 범위 |
+|----|--------|------|------|
+| 1 | 400 | 10 | 150 |
+| 2 | 500 | 11 | 160 |
+| 3 | 600 | 12 | 170 |
+| 4 | 700 | 13 | 180 |
+| 5 | 800 | 14 | 190 |
+
+### AIRSTRIKE_NUKE — 핵공습
+
+단발 고위력 광역. 거대 폭발 + 주변 소폭발.
+
+| Lv | 데미지 | 범위 |
+|----|--------|------|
+| 1 | 1,500 | 300 |
+| 2 | 2,000 | 320 |
+| 3 | 2,700 | 360 |
+| 4 | 3,700 | 400 |
+| 5 | 5,000 | 450 |
+
+### AIRSTRIKE_EMP — EMP 공습
+
+단발 광역. 데미지 + 마비(이동/공격 정지).
+
+| Lv | 데미지 | 범위 | 마비시간 |
+|----|--------|------|----------|
+| 1 | 100 | 120 | 12초 |
+| 2 | 120 | 150 | 18초 |
+| 3 | 150 | 200 | 26초 |
+| 4 | 200 | 250 | 36초 |
+
+### CROSSFIRE_MISSILE — 십자포화
+
+아군 머신에서 미사일 직접 발사.
+
+| Lv | 데미지 | 범위 | 미사일수 |
+|----|--------|------|----------|
+| 1 | 300 | 100 | 2 |
+| 2 | 300 | 105 | 3 |
+| 3 | 300 | 110 | 4 |
+| 4 | 300 | 115 | 5 |
+| 5 | 300 | 120 | 6 |
+| 6 | 300 | 125 | 7 |
+| 7 | 300 | 130 | 8 |
+| 8 | 300 | 135 | 9 |
+
+## 웨이브 시스템
+
+적은 웨이브 단위로 스폰. 레벨이 올라갈수록 적의 종류, 수, 스탯이 증가.
+
+### 스케일링 공식 (`progress = (level - 1) / 79`)
+
+| 속성 | Lv.1 | Lv.80 |
+|------|------|-------|
+| 웨이브 수 | 3 | 6 |
+| 적 HP | 80 | 1,000 |
+| 적 공격력 | 8 | 80 |
+| 적 속도 | 6 | 10 px/s |
+| 적 공속 | 0.6 | 1.2 |
+| 적 사거리 | 100 | 140 |
+| 적 감지거리 | 160 | 200 |
+| 그룹당 적 수 | 2 | 10 |
+| 스폰 간격 | 3초 | 1초 |
+| 첫 웨이브 딜레이 | 5초 | 2초 |
+| 이후 웨이브 딜레이 | 15초 | 5초 |
+
+- 적 탱크 종류: Tank01(Lv.1) ~ Tank32(Lv.80)까지 점진 해금
+- 전장 배경: 27종이 80개 레벨에 순환 배치
+
+## 세이브 시스템
+
+`Preferences("hm-defense/saves")` 기반.
+
+저장 항목:
+- 최종 클리어 스테이지 (0-79)
+- 크레딧 (재화)
+- 머신/터렛/업그레이드/스페셜 레벨
+- 빌드 슬롯 구성 (최대 7개)
+- 스페셜 슬롯 구성 (5개)
+- 스페셜 잔여 수량

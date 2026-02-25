@@ -44,6 +44,12 @@ Described [here](docs/Gameplay.md).
 
 <img alt="screenshot1" height=200 src="https://lioxliu.files.wordpress.com/2012/09/20120904-182543.jpg"/>    <img alt="screenshot2" height=200 src="https://www.simonvideo.com/wp-content/uploads/2011/05/mzl.skpyknie.320x480-75.jpg"/>    <img alt="screenshot3" height=200 src="http://a2.mzstatic.com/us/r1000/107/Purple/01/eb/18/mzl.wqfmuwaf.jpg"/>
 
+## Restoration (2026)
+
+This fork was picked up by [Jun Young Jee](https://github.com/gelb2) in February 2026 to complete the unfinished restoration. Core gameplay systems — combat, unit production, wave generation, special attacks, sound, and visual effects — were implemented through AI-collaborative development with Claude (Anthropic).
+
+Full story: [docs/RESTORATION.md](docs/RESTORATION.md)
+
 ## Additional notes
 
 - This repository holds a complete remake from scratch of the game.

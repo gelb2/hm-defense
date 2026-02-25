@@ -142,6 +142,7 @@ StartScreen → SavesSelectionScreen → StageSelectionScreen → StageScreen
 - 에셋 키: `StageAssetsManager`의 companion object 상수
 - 사운드: `randomSpecialImpactSound()` 등 랜덤 풀 패턴
 - 세이브: `Preferences("hm-defense/saves")`
+- 굵직한 기능 구현 완료 시 `docs/RESTORATION.md`의 복원 진행 섹션에 반영할 것
 
 ## TODO (미해결/진행중)
 

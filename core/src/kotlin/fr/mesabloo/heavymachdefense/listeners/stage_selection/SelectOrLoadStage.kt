@@ -9,13 +9,13 @@ import fr.mesabloo.heavymachdefense.DEV
 import fr.mesabloo.heavymachdefense.MainGame
 import fr.mesabloo.heavymachdefense.managers.assets.assetManager
 import fr.mesabloo.heavymachdefense.managers.assets.buttonAssetsManager
-import fr.mesabloo.heavymachdefense.managers.assets.stageAssetsManager
+import fr.mesabloo.heavymachdefense.managers.assets.preparationAssetsManager
 import fr.mesabloo.heavymachdefense.screens.AbstractScreen
-import fr.mesabloo.heavymachdefense.screens.StageScreen
+import fr.mesabloo.heavymachdefense.screens.PreparationScreen
 import fr.mesabloo.heavymachdefense.screens.StageSelectionScreen
 
 class SelectOrLoadStage(private val screen: StageSelectionScreen, private val index: Int) : ClickListener() {
-    private fun stageScreen(game: MainGame, index: Int) = StageScreen(
+    private fun preparationScreen(game: MainGame, index: Int) = PreparationScreen(
         game,
         index + 1,
         this.screen.save,
@@ -32,24 +32,23 @@ class SelectOrLoadStage(private val screen: StageSelectionScreen, private val in
         if (this.screen.scrollPane.selected == index) {
             this.screen.scrollPane.touchable = Touchable.disabled
 
-            stageAssetsManager.preload(index + 1)
+            preparationAssetsManager.preload()
             buttonAssetsManager.preload()
 
             this.screen.addLoadingOverlay({
                 if (!assetManager.isFinished)
                     assetManager.update()
-                buttonAssetsManager.isFullyLoaded() && stageAssetsManager.isFullyLoaded()
+                buttonAssetsManager.isFullyLoaded() && preparationAssetsManager.isFullyLoaded()
             }) {
                 this@SelectOrLoadStage.screen.background
                     .children.forEach { it.remove() }
 
-                (this.changeScreen(stageScreen(this, index)) as AbstractScreen?)
+                (this.changeScreen(preparationScreen(this, index)) as AbstractScreen?)
                     ?.addLoadingOverlayEnd()
 
                 Timer.schedule(object : Timer.Task() {
                     override fun run() {
                         this@addLoadingOverlay.removeScreen<StageSelectionScreen>()?.dispose()
-                        buttonAssetsManager.dispose()
                     }
                 }, 0.050f)
             }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-02-25 — 머신 업그레이드 준비 화면
+
+- 스테이지 선택과 전투 사이에 PreparationScreen 추가
+- 머신 8종 리스트: 현재 레벨 아이콘, 다음 레벨 아이콘, 업그레이드 비용 표시
+- 더블클릭/더블탭으로 업그레이드 확인 다이얼로그 호출
+- 업그레이드 비용: baseCost × currentLevel (종류별 차등)
+- 크레딧 차감 + 세이브 flush + UI 즉시 갱신
+- DEV 모드: 크레딧 0일 때 20000 자동 지급
+- 스테이지 선택 화면의 OK 버튼 및 더블탭 모두 PreparationScreen 경유
+- PreparationAssetsManager 신규 (bodies.atlas + stage-select.atlas)
+
 ## 2026-02-25 — 웨이브 번호 UI 표시
 
 - 전투 중 현재 웨이브 번호 표시 (WAVE n / total)

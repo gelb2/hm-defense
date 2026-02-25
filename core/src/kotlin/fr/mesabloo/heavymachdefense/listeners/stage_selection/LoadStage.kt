@@ -7,13 +7,13 @@ import com.badlogic.gdx.utils.Timer
 import fr.mesabloo.heavymachdefense.MainGame
 import fr.mesabloo.heavymachdefense.managers.assets.assetManager
 import fr.mesabloo.heavymachdefense.managers.assets.buttonAssetsManager
-import fr.mesabloo.heavymachdefense.managers.assets.stageAssetsManager
+import fr.mesabloo.heavymachdefense.managers.assets.preparationAssetsManager
 import fr.mesabloo.heavymachdefense.screens.AbstractScreen
-import fr.mesabloo.heavymachdefense.screens.StageScreen
+import fr.mesabloo.heavymachdefense.screens.PreparationScreen
 import fr.mesabloo.heavymachdefense.screens.StageSelectionScreen
 
 class LoadStage(private val screen: StageSelectionScreen) : ClickListener() {
-    private fun stageScreen(game: MainGame, index: Int) = StageScreen(
+    private fun preparationScreen(game: MainGame, index: Int) = PreparationScreen(
         game,
         index + 1,
         this.screen.save,
@@ -26,24 +26,23 @@ class LoadStage(private val screen: StageSelectionScreen) : ClickListener() {
 
         this.screen.scrollPane.touchable = Touchable.disabled
 
-        stageAssetsManager.preload(index + 1)
+        preparationAssetsManager.preload()
         buttonAssetsManager.preload()
 
         this.screen.addLoadingOverlay({
             if (!assetManager.isFinished)
                 assetManager.update()
-            buttonAssetsManager.isFullyLoaded() && stageAssetsManager.isFullyLoaded()
+            buttonAssetsManager.isFullyLoaded() && preparationAssetsManager.isFullyLoaded()
         }) {
             this@LoadStage.screen.background
                 .children.forEach { it.remove() }
 
-            (this.changeScreen(stageScreen(this, index)) as AbstractScreen?)
+            (this.changeScreen(preparationScreen(this, index)) as AbstractScreen?)
                 ?.addLoadingOverlayEnd()
 
             Timer.schedule(object: Timer.Task() {
                 override fun run() {
                     this@addLoadingOverlay.removeScreen<StageSelectionScreen>()?.dispose()
-                    buttonAssetsManager.dispose()
                 }
             }, 0.050f)
         }

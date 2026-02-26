@@ -45,7 +45,6 @@ import fr.mesabloo.heavymachdefense.ui.stage.dialog.SystemMenu
 import fr.mesabloo.heavymachdefense.ui.stage.EnemyTank
 import fr.mesabloo.heavymachdefense.managers.assets.levelSelectionAssetsManager
 import fr.mesabloo.heavymachdefense.managers.assets.buttonAssetsManager
-import fr.mesabloo.heavymachdefense.managers.assets.preparationAssetsManager
 import fr.mesabloo.heavymachdefense.ui.stage.game.AllyBase
 import fr.mesabloo.heavymachdefense.ui.stage.game.Bullet
 import fr.mesabloo.heavymachdefense.ui.stage.game.ExplosionEffect
@@ -1196,9 +1195,16 @@ class StageScreen(
         if (victoryTransitioning) return
         victoryTransitioning = true
 
-        // Start preloading next stage assets in background
-        preparationAssetsManager.preload()
+        val nextLevel = this.level + 1
+        val oldLevel = this.level
+
+        // Preload next stage assets (both old and new coexist in memory)
+        stageAssetsManager.preload(nextLevel)
         buttonAssetsManager.preload()
+
+        // Prevent this StageScreen's dispose from touching stageAssetsManager
+        // (stageLevel already changed to nextLevel, dispose would unload wrong backgrounds)
+        skipStageAssetsDispose = true
 
         // Show victory illustration overlay
         val victory = VictoryIllustration()
@@ -1211,24 +1217,35 @@ class StageScreen(
             Actions.run {
                 addLoadingOverlay({
                     if (!assetManager.isFinished) assetManager.update()
-                    preparationAssetsManager.isFullyLoaded() && buttonAssetsManager.isFullyLoaded()
+                    buttonAssetsManager.isFullyLoaded() && stageAssetsManager.isFullyLoaded()
                 }) {
                     this@StageScreen.background.children.forEach { it.remove() }
                     victory.dispose()
 
-                    val nextPrep = PreparationScreen(
+                    // Unload old level's backgrounds (door is closed, safe to free)
+                    val bgNum = getBackgroundForLevel(oldLevel).toString().padStart(2, '0')
+                    val oldBg1 = "gfx/terrains/$bgNum/01.jpg"
+                    val oldBg2 = "gfx/terrains/$bgNum/02.jpg"
+                    if (assetManager.isLoaded(oldBg1)) assetManager.unload(oldBg1)
+                    if (assetManager.isLoaded(oldBg2)) assetManager.unload(oldBg2)
+
+                    val nextStage = StageScreen(
                         this,
-                        this@StageScreen.level + 1,
+                        nextLevel,
                         this@StageScreen.save,
                         this@StageScreen.saveIndex,
                         true
                     )
-                    (this.changeScreen(nextPrep) as AbstractScreen?)
-                        ?.addLoadingOverlayEnd()
+
+                    // KtxGame allows only one screen per type — manual swap required
+                    this.removeScreen<StageScreen>()
+                    this.addScreen(nextStage)
+                    this.setScreen<StageScreen>()
+                    (nextStage as AbstractScreen).addLoadingOverlayEnd()
 
                     Timer.schedule(object : Timer.Task() {
                         override fun run() {
-                            this@addLoadingOverlay.removeScreen<StageScreen>()?.dispose()
+                            this@StageScreen.dispose()
                         }
                     }, 0.050f)
                 }
@@ -1248,6 +1265,8 @@ class StageScreen(
         cellMiningTimer.start()
     }
 
+    private var skipStageAssetsDispose = false
+
     override fun dispose() {
         super.dispose()
 
@@ -1257,7 +1276,9 @@ class StageScreen(
         this.gameWorld.dispose()
 
         animationManager.dispose()
-        stageAssetsManager.dispose()
+        if (!skipStageAssetsDispose) {
+            stageAssetsManager.dispose()
+        }
 
         cellMiningTimer.clear()
     }

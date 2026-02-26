@@ -12,3 +12,4 @@ enum class MachinePart {
 }
 
 const val BG_BORDER = 0x1
+const val TERRAIN_WIDTH = 512f

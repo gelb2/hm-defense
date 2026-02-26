@@ -123,7 +123,7 @@ class Machine(val kind: MachineKind, level: Int) : Group() {
                         pBody.setLinearVelocity(0f, 0f)
                         return false
                     }
-                    pBody.setLinearVelocity(0f, moveSpeed / PPM)
+                    pBody.setLinearVelocity(pBody.linearVelocity.x, moveSpeed / PPM)
                     return false
                 }
             })
@@ -172,7 +172,7 @@ class Machine(val kind: MachineKind, level: Int) : Group() {
                         val frameIdx = (phaseTime / frameDuration).toInt().coerceIn(0, frames.size - 1)
                         lFoot.drawable = TextureRegionDrawable(frames[frameIdx])
 
-                        pBody.setLinearVelocity(0f, burstSpeed / PPM)
+                        pBody.setLinearVelocity(pBody.linearVelocity.x, burstSpeed / PPM)
 
                         val progress = phaseTime / stepDuration
                         actor.x += MathUtils.sin(progress * MathUtils.PI) * swayAmount
@@ -187,7 +187,7 @@ class Machine(val kind: MachineKind, level: Int) : Group() {
                         val frameIdx = (phaseTime / frameDuration).toInt().coerceIn(0, frames.size - 1)
                         rFoot.drawable = TextureRegionDrawable(framesFlipped[frameIdx])
 
-                        pBody.setLinearVelocity(0f, burstSpeed / PPM)
+                        pBody.setLinearVelocity(pBody.linearVelocity.x, burstSpeed / PPM)
 
                         val progress = phaseTime / stepDuration
                         actor.x -= MathUtils.sin(progress * MathUtils.PI) * swayAmount

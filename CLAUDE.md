@@ -151,10 +151,11 @@ StartScreen → SavesSelectionScreen → StageSelectionScreen → PreparationScr
 
 - [ ] 미사일 투사체 트레일 이펙트 (하얀 굵은 실/연기) — 시도 2회 롤백, 방법 미정
 - [ ] 창 리사이즈 시 UI 깨짐 — 머신 빌드 탭 아이콘/버튼 위치 어긋남. FitViewport 리사이즈 처리 문제. 모바일 빌드 시에도 영향 예상
-- [ ] 유닛 충돌/이동 우회 — 현재 유닛 간 겹침 허용, 런타임 충돌 회피 없음. Steerable 인터페이스는 구현돼 있으나 스티어링 행동 미연결. 스폰 시 겹침 방지(findNonOverlappingSpawnX)만 존재
+- [x] 유닛 충돌/이동 우회 — velocity-only 통합 시스템 구현 (반발 벡터 + 겹침 분리). 상세: docs/Gameplay.md "유닛 충돌 회피 시스템" 참조
+- [ ] 유닛 충돌 회피 잔여 떨림 — 대량(20+) 밀집 시 잔여 lateral 떨림. 파라미터 튜닝(LATERAL_SMOOTHING, OVERLAP_SEPARATION_VEL 등) 또는 적 유닛 vel.x 유지 적용 검토
+- [x] AABB 유닛 충돌 — velocity-only 시스템의 overlap separation이 AABB 기반 겹침 감지+분리 역할 수행
 - [ ] NavGrid 패스파인딩 — 맵을 32×32 픽셀 타일(Grid)로 쪼개는 로직. 장애물 위치는 배열로 정리. 그리드 기반 A* 알고리즘 구조 구현
-- [ ] AABB 유닛 충돌 — 각 유닛의 중심에 사각형 충돌체(Bounding Box)를 붙여서 서로 안 겹치게 하는 코드 구현
-- [ ] 머신 종류별 이동 속도 차등 — 현재 전 머신 동일 속도(MACHINE_SPEED). 종류별 속도 맵 또는 MachineKind 프로퍼티로 분리 검토
+- [x] 머신 종류별 이동 속도 차등 — MachineKind.speed 프로퍼티로 구현 완료 (ION 17.5 ~ TANKER 9.5 px/s)
 
 ## Notes
 

@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-02-26 — 유닛 충돌 회피 시스템 + 이동속도 차등
+
+- **충돌 회피 시스템 구현** (GameWorld.kt)
+  - 반발 벡터(repulsion vector) 모델: 인접 유닛으로부터 연속적 lateral repulsion 누적
+  - velocity-only 통합 아키텍처: proximity repulsion + overlap separation 모두 속도 기반
+  - setTransform(위치 텔레포트) 완전 제거 → 속도 시스템과의 충돌(떨림 원인) 해소
+  - 화면 내: 스무딩 적용 (LATERAL_SMOOTHING=0.3), 화면 밖: 즉시 보정 (×30 속도)
+  - 전방 감속: X축 겹침 + Y축 전방에 있는 유닛에 의한 속도 감쇠
+  - terrain X 경계 하드 클램프 (벽 밖 돌출 방지)
+- **머신 종류별 이동속도 차등** (MachineKind.kt)
+  - ION(17.5) > SHOTGUN(16) > RIFLE=HMG(14.4) > PLASMA(12.5) > MISSILE=HEAVY_MISSILE(11) > TANKER(9.5) px/s
+  - 속도 차이로 자연스러운 Y축 유닛 분산 → 밀집도 감소
+- **오프스크린 스폰** (StageScreen.kt)
+  - 아군 Y=-200, 적 Y=2250 (화면 밖)에서 스폰 후 걸어서 진입
+  - 화면 밖에서 회피 스킵 + 강한 분리로 진입 전 간격 확보
+- **기지 레이어 상위 배치**: 유닛이 기지 건물에서 나오는 연출 (toFront)
+- **Machine.kt**: 걷는 동안 vel.x 유지 (vel.x=0 리셋 제거)
+
+## 2026-02-26 — 적 웨이브 스폰 다양성 개선
+
+- 적 웨이브 생성 알고리즘 리라이트 (generateDefaultWaves)
+- 4티어 시스템 도입: SCOUT(빠른 잡졸) / MEDIUM(중간) / HEAVY(강적) / ELITE(보스급)
+- 32종 탱크 모델 전 범위 활용 (기존: 5종 슬라이딩 윈도우)
+- 매 웨이브 2~3개 그룹 동시 스폰으로 적 다양성 확보
+- 티어별 스탯 차등: SCOUT(HP×0.3, 속도×1.3) ~ ELITE(HP×1.5, 속도×0.7)
+- 시드 기반 랜덤으로 레벨 간 조합 다양화 (같은 레벨은 결정론적)
+
 ## 2026-02-26 — 머신 업그레이드 UI 리뉴얼
 
 - 3×3 그리드 + 확인 오버레이 레이아웃으로 전면 개편

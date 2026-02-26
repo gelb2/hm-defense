@@ -51,6 +51,24 @@
 - 크레딧 부족 시 해당 머신 행 비활성화 표시
 - DEV 모드: 크레딧이 0 이하일 때 20,000cr 자동 지급
 
+### 머신 이동속도
+
+종류별로 다른 이동속도를 가진다. 빠른 유닛이 먼저 전선에 도달하여 자연스러운 Y축 분산을 만든다.
+
+| 종류 | 속도 (px/s) |
+|------|-----------|
+| ION | 17.5 |
+| SHOTGUN | 16.0 |
+| RIFLE | 14.4 |
+| HMG | 14.4 |
+| PLASMA | 12.5 |
+| MISSILE | 11.0 |
+| HEAVY_MISSILE | 11.0 |
+| TANKER | 9.5 |
+
+걷기 애니메이션은 스텝 기반 버스트 (0.45초 이동 → 0.25초 정지 반복, 1.4초 주기).
+버스트 속도로 보상하여 평균 속도 = MachineKind.speed 유지.
+
 ### 머신 공통 속성
 - HP, 이동속도, 공격력, 사거리, 감지거리, 재장전 속도
 - 레벨업(1-10)으로 공격력, HP 등 상승
@@ -93,6 +111,82 @@
 | Plasma | 300 px/s | explode-plasma |
 | Shotgun | 380 px/s | — |
 | Tanker | 300 px/s | explode-01 |
+
+## 유닛 충돌 회피 시스템 (GameWorld.kt)
+
+유닛(머신, 적 탱크)의 이동과 겹침 방지를 단일 velocity 기반 시스템으로 관리한다.
+
+### 아키텍처: Velocity-Only
+
+```
+매 프레임 실행 순서:
+1. Machine.Action.act() → vel = (prev_vel.x, burstSpeed/PPM)  [vel.x 유지]
+2. adjustUnitVelocities() → vel 수정 (repulsion + overlap separation)
+3. world.step(1/60) → 속도 기반 위치 이동
+4. Position sync → body.position → actor.position + terrain X 클램프
+```
+
+모든 lateral 이동이 velocity를 통해 이루어지며, setTransform(위치 텔레포트)를 사용하지 않는다.
+초기 구현에서 velocity와 setTransform 두 시스템이 매 프레임 충돌하여 떨림이 발생했고,
+이를 velocity-only로 통합하여 해결했다.
+
+### 두 가지 힘
+
+**1. Proximity Repulsion** (화면 내 이동 중인 유닛만)
+
+인접 유닛으로부터 연속적 반발 벡터를 누적. 유닛 간 edge-to-edge 거리가 INFLUENCE_RADIUS(2.0wu, ~32px) 내일 때 작동.
+
+```
+xProx = clamp((INFLUENCE_RADIUS - gapX) / INFLUENCE_RADIUS, 0, 1)
+yProx = clamp((INFLUENCE_RADIUS - gapY) / INFLUENCE_RADIUS, 0, 1)
+lateralPush += pushDir * xProx * yProx * LATERAL_REPULSION(0.3)
+```
+
+전방 감속: X축으로 겹치면서 Y축 전방에 있는 유닛이 있으면 forward speed 감쇠 (FORWARD_SLOWDOWN=0.6).
+
+**2. Overlap Separation** (모든 유닛: 이동/정지, 화면 내/외)
+
+실제로 겹친 유닛을 속도로 밀어내는 힘. gapX < SEPARATION_BUFFER(0.1wu) && gapY < 0 일 때 작동.
+
+```
+overlapVel = overlapPush * OVERLAP_SEPARATION_VEL(3.0)    // 화면 내
+overlapVel = overlapPush * OFFSCREEN_SEPARATION_VEL(30.0)  // 화면 밖
+```
+
+### 스무딩
+
+lateral velocity에 프레임 간 스무딩 적용 (LATERAL_SMOOTHING=0.3). HashMap<Body, Float>으로 이전 프레임 값 보존.
+Machine.Action은 vel.x를 유지하므로 스무딩 값이 다음 프레임까지 누적된다.
+
+### 오프스크린 스폰
+
+유닛은 화면 밖에서 스폰되어 걸어서 진입한다:
+- 아군: Y=-200px (terrain 하단 밖), 적: Y=2250px (terrain 상단 밖)
+- 화면 밖(Y<0 또는 Y>2048): proximity repulsion 스킵, overlap separation만 강하게 적용 (×30)
+- 기지(StaticBody)를 toFront()로 유닛 위에 렌더링 → 건물에서 나오는 연출
+
+### 경계 처리
+
+- terrain X 경계: velocity 클램프 + position 하드 클램프 (벽 밖 돌출 방지)
+- 정지 중(vel.y≈0) 겹침: 부드러운 분리 속도 부여
+
+### 상수 요약
+
+| 상수 | 값 | 역할 |
+|------|---|------|
+| INFLUENCE_RADIUS | 2.0 wu | 반발 작동 범위 (~32px) |
+| LATERAL_REPULSION | 0.3 | 반발 강도 |
+| FORWARD_SLOWDOWN | 0.6 | 전방 감속 강도 |
+| MAX_LATERAL_RATIO | 0.8 | 최대 횡이동 비율 (전진속도 대비) |
+| LATERAL_SMOOTHING | 0.3 | 횡속도 스무딩 계수 |
+| OVERLAP_SEPARATION_VEL | 3.0 | 겹침→속도 변환 (화면 내) |
+| OFFSCREEN_SEPARATION_VEL | 30.0 | 겹침→속도 변환 (화면 밖) |
+| SEPARATION_BUFFER | 0.1 wu | 유닛 간 유지 간격 (~1.6px) |
+
+### 알려진 제한 / TODO
+
+- 대량 유닛(20+) 밀집 시 잔여 떨림 존재 — 파라미터 튜닝 또는 구조 개선 필요
+- 적 유닛(EnemyTank)은 vel.x=0 고정 — Machine과 동일한 vel.x 유지 적용 검토
 
 ## 터렛 (Turrets) — 6종
 

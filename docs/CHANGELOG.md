@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-02-26 — 머신 업그레이드 UI 리뉴얼
+
+- 3×3 그리드 + 확인 오버레이 레이아웃으로 전면 개편
+- 빌드슬롯 배경 에셋 적용 (gfx/ui/game/build-slot/background.png)
+- 그리드 셀에 완전한 머신 미리보기 표시 (body + weapons + feet)
+- 머신 90° 회전 (위를 향하도록) + 셀 중앙 배치
+- 업그레이드 확인 오버레이에도 완전한 머신 미리보기 적용 (body + weapons + feet, 90° 회전)
+- 업그레이드 확인 오버레이 딤 처리 강화 (0.6 → 0.85)
+- 머신 이동 속도 15% 증가 (12.5 → 14.4 px/s)
+- PreparationAssetsManager에 weapons.atlas, feet.atlas, build-slot 에셋 추가
+- 스테이지 선택 화면 배경/전경 에셋 재활용 (ref counting 활용)
+
 ## 2026-02-26 — 승리 일러스트 화면 + 다음 스테이지 직행
 
 - 스테이지 승리 시 타이틀 일러스트(title.jpg) 페이드인 표시 후 로딩 도어 닫힘 → 다음 스테이지 전환

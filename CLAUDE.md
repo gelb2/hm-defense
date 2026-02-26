@@ -154,6 +154,7 @@ StartScreen → SavesSelectionScreen → StageSelectionScreen → PreparationScr
 - [ ] 유닛 충돌/이동 우회 — 현재 유닛 간 겹침 허용, 런타임 충돌 회피 없음. Steerable 인터페이스는 구현돼 있으나 스티어링 행동 미연결. 스폰 시 겹침 방지(findNonOverlappingSpawnX)만 존재
 - [ ] NavGrid 패스파인딩 — 맵을 32×32 픽셀 타일(Grid)로 쪼개는 로직. 장애물 위치는 배열로 정리. 그리드 기반 A* 알고리즘 구조 구현
 - [ ] AABB 유닛 충돌 — 각 유닛의 중심에 사각형 충돌체(Bounding Box)를 붙여서 서로 안 겹치게 하는 코드 구현
+- [ ] 머신 종류별 이동 속도 차등 — 현재 전 머신 동일 속도(MACHINE_SPEED). 종류별 속도 맵 또는 MachineKind 프로퍼티로 분리 검토
 
 ## Notes
 

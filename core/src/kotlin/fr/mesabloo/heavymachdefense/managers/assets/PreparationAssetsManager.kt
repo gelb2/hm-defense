@@ -10,6 +10,8 @@ import ktx.assets.load
 class PreparationAssetsManager : Disposable {
     companion object {
         const val MACHINE_BODIES = "gfx/models/machines/bodies.atlas"
+        const val MACHINE_WEAPONS = "gfx/models/machines/weapons.atlas"
+        const val MACHINE_FEET = "gfx/models/machines/feet.atlas"
         const val SELECT_BUTTONS = LevelSelectionAssetsManager.SELECT_BUTTONS
         const val BACKGROUND = LevelSelectionAssetsManager.BACKGROUND
         const val FOREGROUND = LevelSelectionAssetsManager.FOREGROUND
@@ -19,6 +21,8 @@ class PreparationAssetsManager : Disposable {
 
     fun preload() {
         assetManager.load<TextureAtlas>(MACHINE_BODIES)
+        assetManager.load<TextureAtlas>(MACHINE_WEAPONS)
+        assetManager.load<TextureAtlas>(MACHINE_FEET)
         assetManager.load<TextureAtlas>(SELECT_BUTTONS)
         assetManager.load<Texture>(BACKGROUND)
         assetManager.load<Texture>(FOREGROUND)
@@ -32,10 +36,21 @@ class PreparationAssetsManager : Disposable {
             .findRegion("${kind.machineName}-$oLevel")
     }
 
+    fun weaponRegion(kind: MachineKind, level: Int): TextureRegion? {
+        val oLevel = level.toString().padStart(2, '0')
+        return assetManager.get<TextureAtlas>(MACHINE_WEAPONS)
+            .findRegion("${kind.machineName}-$oLevel")
+    }
+
+    fun feetRegion(name: String): TextureRegion =
+        assetManager.get<TextureAtlas>(MACHINE_FEET).findRegion(name)
+
     fun texture(path: String): TextureRegion = TextureRegion(assetManager.get<Texture>(path))
 
     fun isFullyLoaded(): Boolean =
         assetManager.isLoaded(MACHINE_BODIES) &&
+                assetManager.isLoaded(MACHINE_WEAPONS) &&
+                assetManager.isLoaded(MACHINE_FEET) &&
                 assetManager.isLoaded(SELECT_BUTTONS) &&
                 assetManager.isLoaded(BACKGROUND) &&
                 assetManager.isLoaded(FOREGROUND) &&
@@ -44,6 +59,8 @@ class PreparationAssetsManager : Disposable {
 
     override fun dispose() {
         assetManager.unload(MACHINE_BODIES)
+        assetManager.unload(MACHINE_WEAPONS)
+        assetManager.unload(MACHINE_FEET)
         assetManager.unload(SELECT_BUTTONS)
         assetManager.unload(BACKGROUND)
         assetManager.unload(FOREGROUND)

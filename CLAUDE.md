@@ -147,15 +147,17 @@ StartScreen → SavesSelectionScreen → StageSelectionScreen → PreparationScr
 - 기능 구현/버그 수정 완료 시 `docs/CHANGELOG.md`에 항목 추가
 - 에셋 추가/변경 시 `docs/ASSETS.md` 업데이트
 
-## TODO (미해결/진행중)
+## TODO
 
-- [ ] 미사일 투사체 트레일 이펙트 (하얀 굵은 실/연기) — 시도 2회 롤백, 방법 미정
-- [ ] 창 리사이즈 시 UI 깨짐 — 머신 빌드 탭 아이콘/버튼 위치 어긋남. FitViewport 리사이즈 처리 문제. 모바일 빌드 시에도 영향 예상
-- [x] 유닛 충돌/이동 우회 — velocity-only 통합 시스템 구현 (반발 벡터 + 겹침 분리). 상세: docs/Gameplay.md "유닛 충돌 회피 시스템" 참조
-- [ ] 유닛 충돌 회피 잔여 떨림 — 대량(20+) 밀집 시 잔여 lateral 떨림. 파라미터 튜닝(LATERAL_SMOOTHING, OVERLAP_SEPARATION_VEL 등) 또는 적 유닛 vel.x 유지 적용 검토
-- [x] AABB 유닛 충돌 — velocity-only 시스템의 overlap separation이 AABB 기반 겹침 감지+분리 역할 수행
-- [ ] NavGrid 패스파인딩 — 맵을 32×32 픽셀 타일(Grid)로 쪼개는 로직. 장애물 위치는 배열로 정리. 그리드 기반 A* 알고리즘 구조 구현
-- [x] 머신 종류별 이동 속도 차등 — MachineKind.speed 프로퍼티로 구현 완료 (ION 17.5 ~ TANKER 9.5 px/s)
+상세 목록: [docs/TODO.md](docs/TODO.md) 참조.
+
+주요 항목 요약:
+- 크래시 위험: 터렛 빌드 슬롯 TODO 스텁 (세이브에 터렛 있으면 즉시 크래시)
+- 미구현 메카닉: 터렛 시스템, 업그레이드 효과(CELL/CR_RESEARCH, BASE_CANNON/DEFENSE), 크레딧 획득, 스페셜 보충
+- 비기능 UI: SupportButton, Help/LeaderBoard 버튼, UpgradeEquipment 버튼
+- 예외 처리: unsafeRegion NPE, 세이브 역직렬화 try-catch 부재, assert-only 범위 검증
+- 죽은 코드: SoundEffectManager, DialogKind, CancelButton, 옛 ECS 코드, Batcher/Drawable 등
+- 진행 중: 미사일 트레일 이펙트, 창 리사이즈 UI 깨짐, 유닛 충돌 잔여 떨림, NavGrid
 
 ## Notes
 

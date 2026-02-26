@@ -49,6 +49,7 @@ import fr.mesabloo.heavymachdefense.ui.stage.game.AllyBase
 import fr.mesabloo.heavymachdefense.ui.stage.game.Bullet
 import fr.mesabloo.heavymachdefense.ui.stage.game.ExplosionEffect
 import fr.mesabloo.heavymachdefense.ui.stage.game.GameResultOverlay
+import fr.mesabloo.heavymachdefense.ui.stage.game.VictoryIllustration
 import fr.mesabloo.heavymachdefense.ui.stage.slots.MachineBuildSlot
 import fr.mesabloo.heavymachdefense.ui.stage.slots.SpecialBuildSlot
 import fr.mesabloo.heavymachdefense.ui.stage.slots.TurretBuildSlot
@@ -94,6 +95,7 @@ class StageScreen(
 
     private var gameEnded = false
     private var gameEndTimer = 0f
+    private var isVictory = false
     private var gameResultOverlay: GameResultOverlay? = null
 
     private val gameObjects = mutableListOf<GameObject>()
@@ -1059,7 +1061,11 @@ class StageScreen(
             if (gameEnded) {
                 gameEndTimer += delta
                 if (gameEndTimer >= 3f) {
-                    returnToStageSelect()
+                    if (isVictory && this.level < 80) {
+                        proceedToNextStage()
+                    } else {
+                        returnToStageSelect()
+                    }
                 }
                 // Still render but skip gameplay updates
                 return
@@ -1131,6 +1137,7 @@ class StageScreen(
             } else if (!enemyBaseEntity.isAlive && !gameEnded) {
                 gameEnded = true
                 gameEndTimer = 0f
+                isVictory = true
                 // Unlock next stage if this is the furthest cleared
                 if (this.level > this.save.lastStageCompleted) {
                     this.save.lastStageCompleted = this.level.coerceAtMost(79)
@@ -1182,6 +1189,70 @@ class StageScreen(
         }
     }
 
+    private var victoryTransitioning = false
+
+    private fun proceedToNextStage() {
+        if (victoryTransitioning) return
+        victoryTransitioning = true
+
+        val nextLevel = this.level + 1
+        val oldLevel = this.level
+
+        // Preload next stage assets (both old and new coexist in memory)
+        stageAssetsManager.preload(nextLevel)
+        buttonAssetsManager.preload()
+
+        // Prevent this StageScreen's dispose from touching stageAssetsManager
+        // (stageLevel already changed to nextLevel, dispose would unload wrong backgrounds)
+        skipStageAssetsDispose = true
+
+        // Show victory illustration overlay
+        val victory = VictoryIllustration()
+        this.background.addActor(victory)
+        victory.zIndex = Int.MAX_VALUE
+
+        // After 1.5s of illustration display, close the loading door over it
+        victory.addAction(Actions.sequence(
+            Actions.delay(1.5f),
+            Actions.run {
+                addLoadingOverlay({
+                    if (!assetManager.isFinished) assetManager.update()
+                    buttonAssetsManager.isFullyLoaded() && stageAssetsManager.isFullyLoaded()
+                }) {
+                    this@StageScreen.background.children.forEach { it.remove() }
+                    victory.dispose()
+
+                    // Unload old level's backgrounds (door is closed, safe to free)
+                    val bgNum = getBackgroundForLevel(oldLevel).toString().padStart(2, '0')
+                    val oldBg1 = "gfx/terrains/$bgNum/01.jpg"
+                    val oldBg2 = "gfx/terrains/$bgNum/02.jpg"
+                    if (assetManager.isLoaded(oldBg1)) assetManager.unload(oldBg1)
+                    if (assetManager.isLoaded(oldBg2)) assetManager.unload(oldBg2)
+
+                    val nextStage = StageScreen(
+                        this,
+                        nextLevel,
+                        this@StageScreen.save,
+                        this@StageScreen.saveIndex,
+                        true
+                    )
+
+                    // KtxGame allows only one screen per type — manual swap required
+                    this.removeScreen<StageScreen>()
+                    this.addScreen(nextStage)
+                    this.setScreen<StageScreen>()
+                    (nextStage as AbstractScreen).addLoadingOverlayEnd()
+
+                    Timer.schedule(object : Timer.Task() {
+                        override fun run() {
+                            this@StageScreen.dispose()
+                        }
+                    }, 0.050f)
+                }
+            }
+        ))
+    }
+
     override fun pause() {
         super.pause()
 
@@ -1194,6 +1265,8 @@ class StageScreen(
         cellMiningTimer.start()
     }
 
+    private var skipStageAssetsDispose = false
+
     override fun dispose() {
         super.dispose()
 
@@ -1203,7 +1276,9 @@ class StageScreen(
         this.gameWorld.dispose()
 
         animationManager.dispose()
-        stageAssetsManager.dispose()
+        if (!skipStageAssetsDispose) {
+            stageAssetsManager.dispose()
+        }
 
         cellMiningTimer.clear()
     }

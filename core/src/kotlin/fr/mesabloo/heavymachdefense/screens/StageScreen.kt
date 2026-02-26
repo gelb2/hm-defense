@@ -45,10 +45,12 @@ import fr.mesabloo.heavymachdefense.ui.stage.dialog.SystemMenu
 import fr.mesabloo.heavymachdefense.ui.stage.EnemyTank
 import fr.mesabloo.heavymachdefense.managers.assets.levelSelectionAssetsManager
 import fr.mesabloo.heavymachdefense.managers.assets.buttonAssetsManager
+import fr.mesabloo.heavymachdefense.managers.assets.preparationAssetsManager
 import fr.mesabloo.heavymachdefense.ui.stage.game.AllyBase
 import fr.mesabloo.heavymachdefense.ui.stage.game.Bullet
 import fr.mesabloo.heavymachdefense.ui.stage.game.ExplosionEffect
 import fr.mesabloo.heavymachdefense.ui.stage.game.GameResultOverlay
+import fr.mesabloo.heavymachdefense.ui.stage.game.VictoryIllustration
 import fr.mesabloo.heavymachdefense.ui.stage.slots.MachineBuildSlot
 import fr.mesabloo.heavymachdefense.ui.stage.slots.SpecialBuildSlot
 import fr.mesabloo.heavymachdefense.ui.stage.slots.TurretBuildSlot
@@ -94,6 +96,7 @@ class StageScreen(
 
     private var gameEnded = false
     private var gameEndTimer = 0f
+    private var isVictory = false
     private var gameResultOverlay: GameResultOverlay? = null
 
     private val gameObjects = mutableListOf<GameObject>()
@@ -1059,7 +1062,11 @@ class StageScreen(
             if (gameEnded) {
                 gameEndTimer += delta
                 if (gameEndTimer >= 3f) {
-                    returnToStageSelect()
+                    if (isVictory && this.level < 80) {
+                        proceedToNextStage()
+                    } else {
+                        returnToStageSelect()
+                    }
                 }
                 // Still render but skip gameplay updates
                 return
@@ -1131,6 +1138,7 @@ class StageScreen(
             } else if (!enemyBaseEntity.isAlive && !gameEnded) {
                 gameEnded = true
                 gameEndTimer = 0f
+                isVictory = true
                 // Unlock next stage if this is the furthest cleared
                 if (this.level > this.save.lastStageCompleted) {
                     this.save.lastStageCompleted = this.level.coerceAtMost(79)
@@ -1180,6 +1188,52 @@ class StageScreen(
                 }
             }, 0.050f)
         }
+    }
+
+    private var victoryTransitioning = false
+
+    private fun proceedToNextStage() {
+        if (victoryTransitioning) return
+        victoryTransitioning = true
+
+        // Start preloading next stage assets in background
+        preparationAssetsManager.preload()
+        buttonAssetsManager.preload()
+
+        // Show victory illustration overlay
+        val victory = VictoryIllustration()
+        this.background.addActor(victory)
+        victory.zIndex = Int.MAX_VALUE
+
+        // After 1.5s of illustration display, close the loading door over it
+        victory.addAction(Actions.sequence(
+            Actions.delay(1.5f),
+            Actions.run {
+                addLoadingOverlay({
+                    if (!assetManager.isFinished) assetManager.update()
+                    preparationAssetsManager.isFullyLoaded() && buttonAssetsManager.isFullyLoaded()
+                }) {
+                    this@StageScreen.background.children.forEach { it.remove() }
+                    victory.dispose()
+
+                    val nextPrep = PreparationScreen(
+                        this,
+                        this@StageScreen.level + 1,
+                        this@StageScreen.save,
+                        this@StageScreen.saveIndex,
+                        true
+                    )
+                    (this.changeScreen(nextPrep) as AbstractScreen?)
+                        ?.addLoadingOverlayEnd()
+
+                    Timer.schedule(object : Timer.Task() {
+                        override fun run() {
+                            this@addLoadingOverlay.removeScreen<StageScreen>()?.dispose()
+                        }
+                    }, 0.050f)
+                }
+            }
+        ))
     }
 
     override fun pause() {

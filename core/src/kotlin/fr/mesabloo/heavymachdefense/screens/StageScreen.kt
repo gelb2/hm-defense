@@ -451,7 +451,7 @@ class StageScreen(
                 isSensor = false
             }
             userData = machine
-            val machineSpawnY = 160f + machine.height / 2f
+            val machineSpawnY = -200f // off-screen below terrain (enough distance for overlap correction)
             position.set(
                 findNonOverlappingSpawnX(machine.width, Team.ALLY, machineSpawnY) / PPM,
                 machineSpawnY / PPM
@@ -460,10 +460,10 @@ class StageScreen(
 
         // Walking animation controls body velocity (step-based movement)
         machine.physicsBody = body
-        machine.startWalkingAnimation(MACHINE_SPEED)
+        machine.startWalkingAnimation(kind.speed)
 
         // Register AI entity
-        val entity = MachineEntity(machine, body, this.gameObjects, MACHINE_SPEED)
+        val entity = MachineEntity(machine, body, this.gameObjects, kind.speed)
         entity.behaviorTree = this.btreeParser.parse(this.btreeSource, entity)
         entity.onShoot = { shooter, target ->
             val shooterPos = shooter.getPosition().cpy().scl(PPM)
@@ -981,7 +981,7 @@ class StageScreen(
         tank.setOrigin(tank.width / 2f, tank.height / 2f)
         tank.rotation = -90f // face downward
 
-        val tankSpawnY = 1900f + tank.height / 2f
+        val tankSpawnY = 2250f // off-screen above terrain (enough distance for overlap correction)
         val spawnX = findNonOverlappingSpawnX(tank.width, Team.ENEMY, tankSpawnY) / PPM
         val spawnY = tankSpawnY / PPM
 

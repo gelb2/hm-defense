@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.Pixmap
 import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.g2d.BitmapFont
 import com.badlogic.gdx.graphics.g2d.TextureRegion
+import com.badlogic.gdx.scenes.scene2d.Actor
 import com.badlogic.gdx.scenes.scene2d.Group
 import com.badlogic.gdx.scenes.scene2d.InputEvent
 import com.badlogic.gdx.scenes.scene2d.Touchable
@@ -17,10 +18,10 @@ import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
 import com.badlogic.gdx.scenes.scene2d.utils.Drawable
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable
 import com.badlogic.gdx.utils.Align
-import com.badlogic.gdx.utils.Scaling
 import fr.mesabloo.heavymachdefense.MainGame
 import fr.mesabloo.heavymachdefense.data.GameSave
 import fr.mesabloo.heavymachdefense.data.MachineKind
+import fr.mesabloo.heavymachdefense.data.models.MachineModel
 import fr.mesabloo.heavymachdefense.ifDev
 import fr.mesabloo.heavymachdefense.listeners.preparation.BackToStageSelection
 import fr.mesabloo.heavymachdefense.listeners.preparation.StartStage
@@ -188,26 +189,25 @@ class PreparationScreen(
         bg.setPosition(0f, 0f)
         cell.addActor(bg)
 
-        // Layer 2: Machine body icon — rotated 90° to face up
-        val bodyRegion = preparationAssetsManager.bodyRegion(kind, currentLevel)
-        val icon = Image(bodyRegion)
-        val origW = bodyRegion.regionWidth.toFloat()  // 64
-        val origH = bodyRegion.regionHeight.toFloat()  // 64
+        // Layer 2: Full machine preview (body + weapons + feet) — rotated 90° to face up
+        val preview = createMachinePreview(kind, currentLevel)
+        val previewW = preview.width
+        val previewH = preview.height
 
-        // After 90° CCW rotation: visual width = origH, visual height = origW
-        val maxDisplayW = CELL_WIDTH - 24f   // 136
-        val maxDisplayH = CELL_HEIGHT - 70f  // 110
-        val iconScale = minOf(maxDisplayW / origH, maxDisplayH / origW)
-        icon.setSize(origW * iconScale, origH * iconScale)
-        icon.setOrigin(icon.width / 2f, icon.height / 2f)
-        icon.rotation = 90f
+        // Scale to fit upper area. After 90° rotation: visual width = previewH, visual height = previewW
+        val maxDisplayW = CELL_WIDTH - 24f
+        val maxDisplayH = CELL_HEIGHT - 70f
+        val previewScale = minOf(maxDisplayW / previewH, maxDisplayH / previewW)
+        preview.setScale(previewScale)
+        preview.setOrigin(previewW / 2f, previewH / 2f)
+        preview.rotation = 90f
 
         // Center in upper area (bottom ~50px reserved for labels)
         val machineCenterX = CELL_WIDTH / 2f
         val machineCenterY = (CELL_HEIGHT + 50f) / 2f
-        icon.setPosition(machineCenterX - icon.width / 2f, machineCenterY - icon.height / 2f)
-        icon.touchable = Touchable.disabled
-        cell.addActor(icon)
+        preview.setPosition(machineCenterX - previewW / 2f, machineCenterY - previewH / 2f)
+        preview.touchable = Touchable.disabled
+        cell.addActor(preview)
 
         // Layer 3: Machine name
         val displayName = kind.machineName.uppercase().replace('-', ' ')
@@ -252,7 +252,7 @@ class PreparationScreen(
         overlay.setSize(UI_WIDTH, UI_HEIGHT)
 
         // Dim background — click to close
-        val dim = Image(colorDrawable(Color(0f, 0f, 0f, 0.6f)))
+        val dim = Image(colorDrawable(Color(0f, 0f, 0f, 0.85f)))
         dim.setSize(UI_WIDTH, UI_HEIGHT)
         dim.touchable = Touchable.enabled
         dim.addListener(object : ClickListener() {
@@ -268,11 +268,25 @@ class PreparationScreen(
         dialog.pad(24f)
         dialog.touchable = Touchable.enabled
 
-        // Machine icon (30% larger than grid icon)
+        // Full machine preview (body + weapons + feet, rotated 90° to face up)
         val iconSize = ICON_SIZE * 1.3f
-        val icon = Image(preparationAssetsManager.bodyRegion(kind, currentLevel))
-        icon.setScaling(Scaling.fit)
-        dialog.add(icon).size(iconSize, iconSize).padBottom(12f).row()
+        val preview = createMachinePreview(kind, currentLevel)
+        val previewW = preview.width
+        val previewH = preview.height
+        // After 90° rotation: visual width = previewH, visual height = previewW
+        val previewScale = minOf(iconSize / previewH, iconSize / previewW)
+        preview.setScale(previewScale)
+        preview.setOrigin(previewW / 2f, previewH / 2f)
+        preview.rotation = 90f
+        // Wrap in fixed-size container for Table layout
+        val visualW = previewH * previewScale
+        val visualH = previewW * previewScale
+        val previewContainer = Group()
+        previewContainer.setSize(visualW, visualH)
+        preview.setPosition(visualW / 2f - previewW / 2f, visualH / 2f - previewH / 2f)
+        preview.touchable = Touchable.disabled
+        previewContainer.addActor(preview)
+        dialog.add(previewContainer).size(visualW, visualH).padBottom(12f).row()
 
         // Machine name
         val displayName = kind.machineName.uppercase().replace('-', ' ')
@@ -355,6 +369,61 @@ class PreparationScreen(
     private fun closeUpgradeOverlay() {
         upgradeOverlay?.remove()
         upgradeOverlay = null
+    }
+
+    /** Assembles a full machine preview (body + weapons + feet) — same logic as Machine.kt */
+    private fun createMachinePreview(kind: MachineKind, level: Int): Group {
+        val model = MachineModel(kind.machineName, level)
+
+        val group = Group()
+
+        // Body
+        val bodyRegion = preparationAssetsManager.bodyRegion(kind, level)
+        val body = Image(bodyRegion)
+        group.setSize(body.width, body.height)
+
+        // Feet (behind body, visible for preview — first frame only)
+        if (model.feetRegions != null && model.feetOffset != null) {
+            val firstFrame = preparationAssetsManager.feetRegion(model.feetRegions[0])
+
+            val leftFoot = Image(firstFrame)
+            leftFoot.setPosition(
+                body.width / 2f + model.feetOffset.first - leftFoot.width / 2f,
+                body.height / 2f + model.feetOffset.second - leftFoot.height / 2f
+            )
+            group.addActor(leftFoot)
+
+            val rightFoot = Image(TextureRegion(firstFrame).also { it.flip(false, true) })
+            rightFoot.setPosition(
+                body.width / 2f + model.feetOffset.first - rightFoot.width / 2f,
+                body.height / 2f - model.feetOffset.second - rightFoot.height / 2f
+            )
+            group.addActor(rightFoot)
+        }
+
+        // Body (on top of feet)
+        body.setPosition(0f, 0f)
+        group.addActor(body)
+
+        // Weapons (on top of body)
+        val weaponRegion = preparationAssetsManager.weaponRegion(kind, level)
+        if (weaponRegion != null) {
+            val weapon1 = Image(weaponRegion)
+            weapon1.setPosition(
+                body.width / 2f + model.leftWeaponOffset.first - weapon1.width / 2f,
+                body.height / 2f + model.leftWeaponOffset.second - weapon1.height / 2f
+            )
+            group.addActor(weapon1)
+
+            val weapon2 = Image(TextureRegion(weaponRegion).also { it.flip(false, true) })
+            weapon2.setPosition(
+                body.width / 2f + model.rightWeaponOffset.first - weapon2.width / 2f,
+                body.height / 2f + model.rightWeaponOffset.second - weapon2.height / 2f
+            )
+            group.addActor(weapon2)
+        }
+
+        return group
     }
 
     private fun performUpgrade(kind: MachineKind) {

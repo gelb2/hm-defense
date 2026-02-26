@@ -78,7 +78,7 @@ class StageScreen(
         const val TEMPORARY_CELL_UPGRADE_RATIO = 0.6f
         const val SLOT_MENU_WIDTH = 128f
         const val SLOT_MENU_HEIGHT = 710f
-        const val MACHINE_SPEED = 12.5f // pixels per second
+        const val MACHINE_SPEED = 14.4f // pixels per second (12.5 × 1.15)
         const val ENEMY_SPEED = 10f // pixels per second
         const val SPAWN_X_MIN = 48f   // terrain is 512px; leave margin for unit half-width
         const val SPAWN_X_MAX = 464f

@@ -13,6 +13,8 @@ class PreparationAssetsManager : Disposable {
         const val SELECT_BUTTONS = LevelSelectionAssetsManager.SELECT_BUTTONS
         const val BACKGROUND = LevelSelectionAssetsManager.BACKGROUND
         const val FOREGROUND = LevelSelectionAssetsManager.FOREGROUND
+        const val BUILD_SLOT_BACKGROUND = StageAssetsManager.UI.BUILD_SLOT_BACKGROUND
+        const val BUILD_SLOT_FOREGROUND = StageAssetsManager.UI.BUILD_SLOT_FOREGROUND
     }
 
     fun preload() {
@@ -20,6 +22,8 @@ class PreparationAssetsManager : Disposable {
         assetManager.load<TextureAtlas>(SELECT_BUTTONS)
         assetManager.load<Texture>(BACKGROUND)
         assetManager.load<Texture>(FOREGROUND)
+        assetManager.load<Texture>(BUILD_SLOT_BACKGROUND)
+        assetManager.load<Texture>(BUILD_SLOT_FOREGROUND)
     }
 
     fun bodyRegion(kind: MachineKind, level: Int): TextureRegion {
@@ -34,13 +38,17 @@ class PreparationAssetsManager : Disposable {
         assetManager.isLoaded(MACHINE_BODIES) &&
                 assetManager.isLoaded(SELECT_BUTTONS) &&
                 assetManager.isLoaded(BACKGROUND) &&
-                assetManager.isLoaded(FOREGROUND)
+                assetManager.isLoaded(FOREGROUND) &&
+                assetManager.isLoaded(BUILD_SLOT_BACKGROUND) &&
+                assetManager.isLoaded(BUILD_SLOT_FOREGROUND)
 
     override fun dispose() {
         assetManager.unload(MACHINE_BODIES)
         assetManager.unload(SELECT_BUTTONS)
         assetManager.unload(BACKGROUND)
         assetManager.unload(FOREGROUND)
+        assetManager.unload(BUILD_SLOT_BACKGROUND)
+        assetManager.unload(BUILD_SLOT_FOREGROUND)
     }
 }
 

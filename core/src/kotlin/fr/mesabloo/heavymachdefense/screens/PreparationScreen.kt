@@ -174,35 +174,59 @@ class PreparationScreen(
         gridGroup.addActor(gridTable)
     }
 
-    private fun createMachineCell(kind: MachineKind, fontName: BitmapFont, fontLevel: BitmapFont): Table {
+    private fun createMachineCell(kind: MachineKind, fontName: BitmapFont, fontLevel: BitmapFont): Group {
         val currentLevel = save.machineUpgrades[kind] ?: 1
         val isMax = currentLevel >= MAX_MACHINE_LEVEL
 
-        val cell = Table()
+        val cell = Group()
+        cell.setSize(CELL_WIDTH, CELL_HEIGHT)
         cell.touchable = Touchable.enabled
-        cell.background = colorDrawable(Color(0.1f, 0.1f, 0.15f, 0.85f))
-        cell.pad(8f)
 
-        // Machine body icon
-        val icon = Image(preparationAssetsManager.bodyRegion(kind, currentLevel))
-        icon.setScaling(Scaling.fit)
+        // Layer 1: Build-slot background — explicitly sized to fill cell
+        val bg = Image(preparationAssetsManager.texture(PreparationAssetsManager.BUILD_SLOT_BACKGROUND))
+        bg.setSize(CELL_WIDTH, CELL_HEIGHT)
+        bg.setPosition(0f, 0f)
+        cell.addActor(bg)
+
+        // Layer 2: Machine body icon — rotated 90° to face up
+        val bodyRegion = preparationAssetsManager.bodyRegion(kind, currentLevel)
+        val icon = Image(bodyRegion)
+        val origW = bodyRegion.regionWidth.toFloat()  // 64
+        val origH = bodyRegion.regionHeight.toFloat()  // 64
+
+        // After 90° CCW rotation: visual width = origH, visual height = origW
+        val maxDisplayW = CELL_WIDTH - 24f   // 136
+        val maxDisplayH = CELL_HEIGHT - 70f  // 110
+        val iconScale = minOf(maxDisplayW / origH, maxDisplayH / origW)
+        icon.setSize(origW * iconScale, origH * iconScale)
+        icon.setOrigin(icon.width / 2f, icon.height / 2f)
+        icon.rotation = 90f
+
+        // Center in upper area (bottom ~50px reserved for labels)
+        val machineCenterX = CELL_WIDTH / 2f
+        val machineCenterY = (CELL_HEIGHT + 50f) / 2f
+        icon.setPosition(machineCenterX - icon.width / 2f, machineCenterY - icon.height / 2f)
         icon.touchable = Touchable.disabled
-        cell.add(icon).size(ICON_SIZE, ICON_SIZE).padBottom(6f).row()
+        cell.addActor(icon)
 
-        // Machine name
+        // Layer 3: Machine name
         val displayName = kind.machineName.uppercase().replace('-', ' ')
-        cell.add(Label(displayName, Label.LabelStyle(fontName, Color.WHITE)).also {
-            it.touchable = Touchable.disabled
-            it.setAlignment(Align.center)
-        }).row()
+        val nameLabel = Label(displayName, Label.LabelStyle(fontName, Color.WHITE))
+        nameLabel.setAlignment(Align.center)
+        nameLabel.setSize(CELL_WIDTH, nameLabel.prefHeight)
+        nameLabel.setPosition(0f, 28f)
+        nameLabel.touchable = Touchable.disabled
+        cell.addActor(nameLabel)
 
-        // Level text
+        // Layer 4: Level text
         val levelColor = if (isMax) Color(0.478f, 1f, 0.933f, 1f) else Color(0.7f, 0.7f, 0.7f, 1f)
         val levelText = if (isMax) "Lv.$currentLevel MAX" else "Lv.$currentLevel"
-        cell.add(Label(levelText, Label.LabelStyle(fontLevel, levelColor)).also {
-            it.touchable = Touchable.disabled
-            it.setAlignment(Align.center)
-        })
+        val levelLabel = Label(levelText, Label.LabelStyle(fontLevel, levelColor))
+        levelLabel.setAlignment(Align.center)
+        levelLabel.setSize(CELL_WIDTH, levelLabel.prefHeight)
+        levelLabel.setPosition(0f, 12f)
+        levelLabel.touchable = Touchable.disabled
+        cell.addActor(levelLabel)
 
         cell.addListener(object : ClickListener() {
             override fun clicked(event: InputEvent?, x: Float, y: Float) {

@@ -32,14 +32,6 @@ private class Border(val border: BorderKind, private val isHorizontal: Boolean, 
             this.width = 4f
             this.height = maxHeight + this.width
         }
-
-//        this.addActor(mkImage().also {
-//            if (isHorizontal) {
-//                it.setPosition(-it.width, -it.height + it.width)
-//            } else {
-//                it.setPosition(0f, 0f)
-//            }
-//        })
     }
 
     override fun act(delta: Float) {

@@ -67,17 +67,17 @@
 
 정리 대상. 기능에 영향 없이 삭제 가능.
 
-- [ ] `SoundEffectManager` — 미사용 클래스 + `TODO()` dispose (`SoundManager.kt:36`)
-- [ ] `DialogKind` enum — 어디서도 참조 안 됨 (`ui/common/dialog/DialogKind.kt`)
-- [ ] `CancelButton` — 정의만 있고 인스턴스 없음 (`ui/common/Buttons.kt:15`)
+- [x] ~~`SoundEffectManager` — 미사용 클래스 + `TODO()` dispose~~ (삭제됨)
+- [x] ~~`DialogKind` enum — 어디서도 참조 안 됨~~ (파일 삭제됨)
+- [x] ~~`CancelButton` — 정의만 있고 인스턴스 없음~~ (삭제됨)
 - [ ] `MachineModel.toPositionedBody()` — 호출부 주석 처리됨 (`data/models/MachineModel.kt:137`)
-- [ ] `entities/Machine.kt` 주석 블록 — 60줄 옛 Ashley ECS 코드 (`:8-66`)
-- [ ] `Slots.kt` — 빈 파일, 패키지 선언만 (`ui/stage/Slots.kt`)
+- [x] ~~`entities/Machine.kt` 주석 블록 — 60줄 옛 Ashley ECS 코드~~ (삭제됨)
+- [x] ~~`Slots.kt` — 빈 파일, 패키지 선언만~~ (파일 삭제됨)
 - [ ] `Batcher` + `Drawable` — Scene2D로 대체된 커스텀 렌더링 레이어 (`internal/`)
-- [ ] `MachinePart.LEFT_FOOT/RIGHT_FOOT` — 미사용 enum 값 (`Constants.kt`)
+- [x] ~~`MachinePart.LEFT_FOOT/RIGHT_FOOT` — 미사용 enum 값~~ (삭제됨)
 - [ ] `GameSave.turretUpgrades` — 읽거나 쓰는 곳 없음
 - [ ] `ENEMY_PLANE` / `SHIPS` 에셋 — 매 스테이지 로딩하지만 사용처 없음
-- [ ] `Radar Border.init` — 자식 추가 주석 처리 (`Radar.kt:36-42`)
+- [x] ~~`Radar Border.init` — 자식 추가 주석 처리~~ (삭제됨)
 
 ## 6. 기존 진행 중 항목
 

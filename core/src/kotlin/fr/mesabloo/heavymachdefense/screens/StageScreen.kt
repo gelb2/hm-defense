@@ -1061,7 +1061,9 @@ class StageScreen(
         this.baseAttackLevel = this.save.mainUpgrades[UpgradeKind.BASE_CANNON] ?: 1
 
         // Sync pause state to Terrain before ui.act() so gameplay actors get delta=0
-        this.terrain.gamePaused = this.gamePaused
+        if (::terrain.isInitialized) {
+            this.terrain.gamePaused = this.gamePaused
+        }
 
         super.render(delta)
 

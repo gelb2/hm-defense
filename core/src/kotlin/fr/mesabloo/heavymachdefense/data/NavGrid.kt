@@ -241,18 +241,17 @@ class NavGrid(private val data: NavGridJson) {
                     continue
                 }
 
-                tmpVec.set(0f, 0f)
-                var bestDist = dist[r][c]
+                // Continuous gradient via cardinal central differences.
+                // Produces smooth directions instead of discrete 8-directional vectors.
+                // Blocked/OOB neighbors fall back to myDist → zero contribution on that axis.
+                val myDist = dist[r][c]
+                val dL = if (c > 0        && dist[r][c - 1] < Float.MAX_VALUE) dist[r][c - 1] else myDist
+                val dR = if (c < COLS - 1  && dist[r][c + 1] < Float.MAX_VALUE) dist[r][c + 1] else myDist
+                val dU = if (r > 0        && dist[r - 1][c] < Float.MAX_VALUE) dist[r - 1][c] else myDist
+                val dD = if (r < ROWS - 1  && dist[r + 1][c] < Float.MAX_VALUE) dist[r + 1][c] else myDist
 
-                for (d in 0..7) {
-                    val nr = r + dr[d]
-                    val nc = c + dc[d]
-                    if (nr in 0 until ROWS && nc in 0 until COLS && dist[nr][nc] < bestDist) {
-                        bestDist = dist[nr][nc]
-                        // Grid row+1 = down in image = lower Y in world → world Y = -1
-                        tmpVec.set(dc[d].toFloat(), -dr[d].toFloat())
-                    }
-                }
+                // Negative gradient = descent direction; convert row→worldY (row↓ = Y↑)
+                tmpVec.set(-(dR - dL), dD - dU)
 
                 if (tmpVec.len2() > 0f) {
                     output[r][c] = tmpVec.cpy().nor()

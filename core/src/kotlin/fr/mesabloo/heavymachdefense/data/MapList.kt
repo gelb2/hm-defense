@@ -11,7 +11,7 @@ private data class MapInfo(val level: Int, val background: Int)
 private lateinit var maps: MutableList<Int>
 
 fun getBackgroundForLevel(level: Int): Int {
-    assert(level in 1..80)
+    require(level in 1..80) { "Level must be 1..80, got $level" }
 
     if (!::maps.isInitialized) {
         maps = mutableListOf()

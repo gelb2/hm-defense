@@ -39,13 +39,15 @@ class SavesSelectionScreen(game: MainGame, isLoading: Boolean = false) : Abstrac
         Gdx.app.debug(this.javaClass.simpleName, "Found $numberOfSaves saves in preferences")
 
         for (i in 0 until numberOfSaves) {
-            this.saves.add(
-                i,
-                this.prefs.get<String>("$i")?.let { Json.decodeFromString(it) } ?: GameSave(
-                    creationDate = Date(),
-                    lastAccessedDate = Date()
-                )
-            )
+            val save: GameSave = this.prefs.get<String>("$i")?.let { json ->
+                try {
+                    Json.decodeFromString<GameSave>(json).also { it.checkValid() }
+                } catch (e: Exception) {
+                    Gdx.app.error(this.javaClass.simpleName, "Corrupted save at index $i, resetting", e)
+                    null
+                }
+            } ?: GameSave(creationDate = Date(), lastAccessedDate = Date())
+            this.saves.add(i, save)
         }
         this.saves.sortBy { it.creationDate }
     }

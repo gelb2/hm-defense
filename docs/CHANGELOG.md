@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-03-02 — NavGrid 지형 장애물 회피 + Foreground 오버레이
+
+- **NavGrid 시스템 구현** (NavGrid.kt, generate_navgrid.py)
+  - 16×64 타일(32px) BFS flow field 경로 탐색
+  - flowToBase(적용) / flowToTop(아군용) 이중 flow field
+  - 27개 지형 전부 navgrid JSON 생성, BFS 유효성 검증 통과
+  - 지형별 수동 오버라이드 (다리, 건물, 물 등) + 자동 픽셀 분석
+- **적/아군 NavGrid 연동** (EnemyTankEntity.kt, Machine.kt, StageScreen.kt)
+  - 적 유닛: walk()에서 navGrid.getFlowToBase()로 이동 방향 결정
+  - 아군 머신: smooth/burst 이동 모두 navGrid.getFlowToTop() 적용
+  - NavGrid 없으면 기존 직선 이동으로 fallback
+- **adjustUnitVelocities flow field 보존 버그 수정** (GameWorld.kt)
+  - 기존: `speed = abs(vel.y)` → flow field X 성분 완전 소실
+  - 수정: `totalSpeed = sqrt(vel.x² + vel.y²)`, `latVel = vel.x + proximityLat + overlapVel`
+  - isMoving 판정도 전체 속도 벡터 기반으로 변경
+- **Foreground 오버레이 시스템** (StageAssetsManager.kt, Terrain.kt, GameWorld.kt)
+  - 01-fg.png / 02-fg.png 존재 시 자동 로드
+  - 유닛 위, 기지 아래로 z-order 렌더링 (건물 뒤로 지나가는 효과)
+  - terrain 25(공장): 전면 walkable + foreground 오버레이 적용
+- **도구** (tools/)
+  - generate_navgrid.py: navgrid JSON + 디버그 이미지 생성
+  - extract_black_regions.py: 사용자 어노테이션 이미지에서 blocked 영역 추출
+  - generate_foreground.py: blocked 영역에서 foreground PNG 오버레이 생성
+- **알려진 이슈**: terrain 25 foreground 마스크가 32px 타일 단위로 과도 — 정밀도 개선 필요
+
 ## 2026-02-26 — 유닛 충돌 회피 시스템 + 이동속도 차등
 
 - **충돌 회피 시스템 구현** (GameWorld.kt)

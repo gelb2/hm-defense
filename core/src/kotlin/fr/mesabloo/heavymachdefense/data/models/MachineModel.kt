@@ -1,18 +1,7 @@
 package fr.mesabloo.heavymachdefense.data.models
 
 import com.badlogic.gdx.Gdx
-import com.badlogic.gdx.math.Vector2
-import com.badlogic.gdx.physics.box2d.Body
-import com.badlogic.gdx.physics.box2d.BodyDef
-import com.badlogic.gdx.physics.box2d.Joint
-import com.badlogic.gdx.physics.box2d.World
 import com.badlogic.gdx.utils.JsonReader
-import fr.mesabloo.heavymachdefense.MachinePart
-import fr.mesabloo.heavymachdefense.PPM
-import ktx.box2d.body
-import ktx.box2d.box
-import ktx.box2d.distanceJointWith
-import ktx.math.vec2
 
 /**
  * A class to hold very low-level construction-oriented sizes, offsets etc. to correctly create machines dynamically.
@@ -126,81 +115,4 @@ class MachineModel(name: String, level: Int) {
         }
     }
 
-    /**
-     * Creates some jointed bodies from the model specification parsed in the constructor.
-     *
-     * @param world The [World] in which the bodies will live in
-     * @param pos The spawning position of the machine, corresponding to the center of the body, in world units
-     *
-     * @return A pair containing all the bodies created as well as the joints between them
-     */
-    fun toPositionedBody(world: World, pos: Vector2): Pair<List<Body>, List<Joint>> {
-        val center = vec2(
-            (pos.x + this@MachineModel.bodySize.first / 2f) / PPM,
-            (pos.y + this@MachineModel.bodySize.second / 2f) / PPM
-        )
-
-        val bodies = listOf(
-            world.body {
-                type = BodyDef.BodyType.KinematicBody
-                box(
-                    width = this@MachineModel.bodySize.first / PPM,
-                    height = this@MachineModel.bodySize.second / PPM
-                ) {
-                    density = 10f
-                    restitution = 0f
-                    friction = 1f
-                    isSensor = false
-                }
-                userData = MachinePart.BODY
-                position.set(center)
-            },
-            world.body {
-                type = BodyDef.BodyType.KinematicBody
-                box(
-                    width = this@MachineModel.leftWeaponSize.first / PPM,
-                    height = this@MachineModel.leftWeaponSize.second / PPM
-                ) {
-                    density = 0f
-                    restitution = 0f
-                    isSensor = true
-                    friction = 0f
-                }
-                userData = MachinePart.LEFT_WEAPON
-                position.set(
-                    center.x + this@MachineModel.leftWeaponOffset.first / PPM,
-                    center.y + this@MachineModel.leftWeaponOffset.second / PPM
-                )
-            },
-            world.body {
-                type = BodyDef.BodyType.KinematicBody
-                box(
-                    width = this@MachineModel.rightWeaponSize.first / PPM,
-                    height = this@MachineModel.rightWeaponSize.second / PPM,
-                ) {
-                    density = 0f
-                    restitution = 0f
-                    isSensor = true
-                    friction = 0f
-                }
-                userData = MachinePart.RIGHT_WEAPON
-                position.set(
-                    center.x + this@MachineModel.rightWeaponOffset.first / PPM,
-                    center.y + this@MachineModel.rightWeaponOffset.second / PPM
-                )
-            }
-        )
-        val joints = listOf(
-            bodies[0].distanceJointWith(bodies[1]) {
-                frequencyHz = 0f
-                dampingRatio = 1f
-            },
-            bodies[0].distanceJointWith(bodies[2]) {
-                frequencyHz = 0f
-                dampingRatio = 1f
-            }
-        )
-
-        return Pair(bodies, joints)
-    }
 }

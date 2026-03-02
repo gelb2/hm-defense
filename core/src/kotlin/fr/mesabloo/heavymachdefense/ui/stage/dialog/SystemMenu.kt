@@ -115,6 +115,7 @@ class SystemMenu(
     }
 
     override fun show(stage: Stage): Dialog {
+        screen.gamePaused = true
         cellMiningTimer.pause()
 
         val dialog = super.show(stage, null)
@@ -125,6 +126,7 @@ class SystemMenu(
     }
 
     override fun hide() {
+        screen.gamePaused = false
         cellMiningTimer.resume()
 
         super.hide(null)

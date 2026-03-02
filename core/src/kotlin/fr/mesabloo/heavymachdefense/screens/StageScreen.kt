@@ -112,6 +112,9 @@ class StageScreen(
 
     private var upgradeMenuShown: Boolean = false
 
+    /** When true, all gameplay systems are frozen (physics, AI, spawning, Scene2D actions on terrain). */
+    var gamePaused: Boolean = false
+
     private lateinit var title: Title
     private lateinit var terrain: Terrain
 
@@ -1057,9 +1060,12 @@ class StageScreen(
         this.baseDefenseLevel = this.save.mainUpgrades[UpgradeKind.BASE_DEFENSE] ?: 1
         this.baseAttackLevel = this.save.mainUpgrades[UpgradeKind.BASE_CANNON] ?: 1
 
+        // Sync pause state to Terrain before ui.act() so gameplay actors get delta=0
+        this.terrain.gamePaused = this.gamePaused
+
         super.render(delta)
 
-        if (!this.isLoading) {
+        if (!this.isLoading && !this.gamePaused) {
             // Game end countdown
             if (gameEnded) {
                 gameEndTimer += delta

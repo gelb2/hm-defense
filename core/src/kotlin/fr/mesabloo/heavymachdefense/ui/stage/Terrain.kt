@@ -8,6 +8,13 @@ import fr.mesabloo.heavymachdefense.managers.assets.stageAssetsManager
 class Terrain : Group() {
     val foregroundActors = mutableListOf<Actor>()
 
+    /** When true, all gameplay actors (children) receive delta=0, freezing in place. */
+    var gamePaused = false
+
+    override fun act(delta: Float) {
+        super.act(if (gamePaused) 0f else delta)
+    }
+
     init {
         this.height = 2048f
         this.width = 512f

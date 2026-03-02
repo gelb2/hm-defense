@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-03-02 — 게임 Pause/Resume
+
+- **SystemMenu 열기 시 전체 게임플레이 정지** (StageScreen.kt, Terrain.kt, SystemMenu.kt)
+  - `Terrain.act()` 오버라이드: pause 시 모든 자식 액터에 `delta=0` 전달
+  - Box2D 물리, AI 행동트리, 적 스폰, 투사체, 이펙트, 보행 애니메이션 모두 동결
+  - UI (메뉴, 볼륨 슬라이더, 버튼)는 정상 작동
+  - Resume Game 클릭 시 즉시 재개
+
 ## 2026-03-02 — 몸체 회전 필터 + NavGrid 지형 수정
 
 - **적 탱크 몸체 회전 — 4중 필터** (EnemyTankEntity.kt)

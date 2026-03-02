@@ -82,6 +82,10 @@ project(":core") {
     apply plugin: "java-library"
     apply plugin: "org.jetbrains.kotlin.plugin.serialization"
 
+    sourceSets {
+        test.kotlin.srcDirs = ["src/test/kotlin"]
+    }
+
     dependencies {
         api "com.badlogicgames.gdx:gdx:$gdxVersion"
         api "com.badlogicgames.gdx:gdx-box2d:$gdxVersion"
@@ -107,5 +111,19 @@ project(":core") {
 
         // JSON (de)serialization
         implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3'
+
+        // Test dependencies
+        testImplementation "org.jetbrains.kotlin:kotlin-test-junit5:2.1.0"
+        testImplementation "org.junit.jupiter:junit-jupiter:5.10.0"
+        testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+
+        // Headless LibGDX backend for tests needing Vector2, Gdx.files, etc.
+        testImplementation "com.badlogicgames.gdx:gdx-backend-headless:$gdxVersion"
+        testImplementation "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop"
+        testImplementation "com.badlogicgames.gdx:gdx-box2d-platform:$gdxVersion:natives-desktop"
+    }
+
+    test {
+        useJUnitPlatform()
     }
 }

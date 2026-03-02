@@ -29,6 +29,7 @@ import fr.mesabloo.heavymachdefense.entities.createTerrainBody
 import ktx.box2d.body
 import ktx.box2d.box
 import fr.mesabloo.heavymachdefense.data.Specials
+import fr.mesabloo.heavymachdefense.listeners.ShowComingSoon
 import fr.mesabloo.heavymachdefense.listeners.stage.*
 import fr.mesabloo.heavymachdefense.managers.BackgroundMusicManager
 import fr.mesabloo.heavymachdefense.managers.WaveManager
@@ -220,7 +221,7 @@ class StageScreen(
         this.background.addActor(MachSlot().also {
             it.setPosition(UI_WIDTH - it.width, 57f)
         })
-        this.background.addActor(CellCounter(this::maxCells, this::currentCells).also {
+        this.background.addActor(CellCounter(this::maxCells, this::currentCells, this.cellResearchMultiplier).also {
             it.setPosition(652f, 995f)
         })
         this.background.addActor(
@@ -259,36 +260,22 @@ class StageScreen(
 
             var currentY = contentHeight - 76f
             for (slot in this.save.buildSlots) {
-                it.addActor(when (slot) {
+                val buildSlot = when (slot) {
                     is MachineSlot -> MachineBuildSlot(
-                        slot,
-                        this.save,
-                        this.builds,
-                        this::currentCells,
-                        this.buildQueue
+                        slot, this.save, this.builds, this::currentCells, this.buildQueue
                     )
                     is TurretSlot -> TurretBuildSlot(
-                        slot,
-                        this.save,
-                        this.builds,
-                        this::currentCells,
-                        this.buildQueue
+                        slot, this.save, this.builds, this::currentCells, this.buildQueue
                     )
-                    else -> TODO()
-                }.also {
-                    it.setPosition(40f, currentY)
-
-                    it.addListener(
-                        BuildMachineIfPossible(
-                            it,
-                            this::currentCells,
-                            this.buildQueue,
-                            this.builds,
-                            this::upgradeMenuShown
-                        )
+                    else -> continue
+                }
+                buildSlot.setPosition(40f, currentY)
+                buildSlot.addListener(
+                    BuildMachineIfPossible(
+                        buildSlot, this::currentCells, this.buildQueue, this.builds, this::upgradeMenuShown
                     )
-                })
-
+                )
+                it.addActor(buildSlot)
                 currentY -= 102f
             }
 
@@ -308,16 +295,15 @@ class StageScreen(
 
             var currentY = SLOT_MENU_HEIGHT - 76f
             for (slot in this.save.specialSlots) {
-                it.addActor(when (slot) {
+                val buildSlot = when (slot) {
                     is SpecialSlot -> SpecialBuildSlot(slot, this.save, this.specials)
-                    else -> TODO()
-                }.also { buildSlot ->
-                    buildSlot.setPosition(40f, currentY)
-                    buildSlot.addListener(UseSpecialAttack(buildSlot, this::upgradeMenuShown) { slot ->
-                        executeSpecialAttack(slot.kind)
-                    })
+                    else -> continue
+                }
+                buildSlot.setPosition(40f, currentY)
+                buildSlot.addListener(UseSpecialAttack(buildSlot, this::upgradeMenuShown) { slot ->
+                    executeSpecialAttack(slot.kind)
                 })
-
+                it.addActor(buildSlot)
                 currentY -= 102f
             }
 
@@ -332,6 +318,7 @@ class StageScreen(
             this.upgradeEquipButton = it
 
             it.setPosition(650f, 180f)
+            it.addListener(ShowComingSoon(this.ui))
         })
 
         val controlsGroup = Group()
@@ -401,8 +388,9 @@ class StageScreen(
         this.allyBase = basesResult.allyBase
 
         // Register bases as targetable game objects
-        this.allyBaseEntity = BaseEntity(basesResult.allyBase, basesResult.allyBody, this.gameObjects, Team.ALLY, 500, 500)
-        this.enemyBaseEntity = BaseEntity(basesResult.enemyBase, basesResult.enemyBody, this.gameObjects, Team.ENEMY, 500, 500)
+        val allyBaseHp = this.upgrades.base_defense[(this.save.mainUpgrades[UpgradeKind.BASE_DEFENSE] ?: 1).coerceIn(1..this.upgrades.base_defense.size) - 1].defense.toInt()
+        this.allyBaseEntity = BaseEntity(basesResult.allyBase, basesResult.allyBody, this.gameObjects, Team.ALLY, allyBaseHp, allyBaseHp)
+        this.enemyBaseEntity = BaseEntity(basesResult.enemyBase, basesResult.enemyBody, this.gameObjects, Team.ENEMY, 10000, 10000)
         this.gameObjects.add(allyBaseEntity)
         this.gameObjects.add(enemyBaseEntity)
 
@@ -1123,6 +1111,10 @@ class StageScreen(
                             obj.tank.remove()
                             spawnEffect("explode-npc", deathPos)
                             stageAssetsManager.sound(StageAssetsManager.SOUND_GROUND_EXPLOSION).play(this.effectsVolume)
+
+                            // Award credits for enemy kill (base = maxHp/10, scaled by CR_RESEARCH)
+                            val reward = (obj.tank.maxHp / 10 * this.crResearchMultiplier).toLong().coerceAtLeast(1L)
+                            this.save.credits += reward
                         }
                     }
                     true

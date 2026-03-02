@@ -8,6 +8,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.*
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
 import com.badlogic.gdx.scenes.scene2d.utils.NinePatchDrawable
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable
+import fr.mesabloo.heavymachdefense.listeners.ShowComingSoon
 import fr.mesabloo.heavymachdefense.listeners.stage.SaveAndExitStage
 import fr.mesabloo.heavymachdefense.listeners.stage.SetBackgroundMusicVolume
 import fr.mesabloo.heavymachdefense.listeners.stage.SetEffectsVolume
@@ -79,8 +80,12 @@ class SystemMenu(
             table.add(MenuButton(ButtonKind.SAVE).also {
                 it.addListener(SaveAndExitStage(this.screen, this))
             }).row()
-            table.add(MenuButton(ButtonKind.HELP)).row()
-            table.add(MenuButton(ButtonKind.LEADER_BOARD)).padBottom(70f).row()
+            table.add(MenuButton(ButtonKind.HELP).also {
+                it.addListener(ShowComingSoon(screen.ui))
+            }).row()
+            table.add(MenuButton(ButtonKind.LEADER_BOARD).also {
+                it.addListener(ShowComingSoon(screen.ui))
+            }).padBottom(70f).row()
             table.add(Table().also {
                 it.add(Image(stageAssetsManager.get(StageAssetsManager.Dialog.VOLUME_OPTIONS))).left()
                 it.add(Table().also {

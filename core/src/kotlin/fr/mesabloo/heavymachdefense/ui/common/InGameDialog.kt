@@ -135,6 +135,46 @@ object InGameDialog {
         stage.keyboardFocus = textField
     }
 
+    fun showComingSoon(stage: Stage) {
+        val font = fontManager.bitmapFonts[FontManager.TREBUCHET_MS_BOLD_16_WHITE]!!
+
+        val overlay = Table()
+        overlay.setFillParent(true)
+        overlay.background = colorDrawable(Color(0f, 0f, 0f, 0.6f))
+
+        val dialog = Table()
+        dialog.background = colorDrawable(Color(0.15f, 0.15f, 0.2f, 0.95f))
+        dialog.pad(24f)
+
+        val labelStyle = Label.LabelStyle(font, Color.WHITE)
+        dialog.add(Label("Coming Soon", labelStyle)).padBottom(20f).row()
+
+        val btnStyle = TextButton.TextButtonStyle()
+        btnStyle.font = font
+        btnStyle.fontColor = Color.WHITE
+        btnStyle.up = colorDrawable(Color(0.3f, 0.5f, 0.8f, 1f))
+        btnStyle.down = colorDrawable(Color(0.2f, 0.4f, 0.7f, 1f))
+        btnStyle.up.leftWidth = 12f
+        btnStyle.up.rightWidth = 12f
+        btnStyle.up.topHeight = 8f
+        btnStyle.up.bottomHeight = 8f
+        btnStyle.down.leftWidth = 12f
+        btnStyle.down.rightWidth = 12f
+        btnStyle.down.topHeight = 8f
+        btnStyle.down.bottomHeight = 8f
+
+        val okBtn = TextButton("OK", btnStyle)
+        okBtn.addListener(object : ClickListener() {
+            override fun clicked(event: InputEvent?, x: Float, y: Float) {
+                overlay.remove()
+            }
+        })
+        dialog.add(okBtn).width(120f)
+
+        overlay.add(dialog)
+        stage.addActor(overlay)
+    }
+
     fun showConfirm(
         stage: Stage,
         message: String,

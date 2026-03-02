@@ -163,7 +163,7 @@ class TurretBuildSlot(
 ) :
     BuildSlot(cellCounter, queue, 1) {
     override fun updateBuildingNumber() {
-        TODO("Not yet implemented")
+        this.building = 0  // Turret build not yet implemented
     }
 }
 

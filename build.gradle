@@ -76,6 +76,9 @@ project(":desktop") {
         api "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop"
         api "com.badlogicgames.gdx:gdx-box2d-platform:$gdxVersion:natives-desktop"
     }
+
+    // Run core tests before desktop compile (classes doesn't depend on core:jar)
+    tasks.named('compileKotlin') { dependsOn ':core:test' }
 }
 
 project(":core") {

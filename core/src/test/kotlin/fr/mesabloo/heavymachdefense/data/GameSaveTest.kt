@@ -153,4 +153,84 @@ class GameSaveTest {
         val save = freshSave()
         assertEquals(5, save.specialSlots.size)
     }
+
+    // --- TurretSlot validation ---
+
+    @Test
+    fun `locked turret in buildSlots rejected`() {
+        val save = freshSave().apply {
+            turretUpgrades[TurretKind.LASER] = 0
+            buildSlots = mutableListOf(TurretSlot(TurretKind.LASER))
+        }
+        assertThrows<InvalidSaveException> { save.checkValid() }
+    }
+
+    @Test
+    fun `unlocked turret in buildSlots accepted`() {
+        val save = freshSave().apply {
+            turretUpgrades[TurretKind.RIFLE] = 1
+            buildSlots = mutableListOf(TurretSlot(TurretKind.RIFLE))
+        }
+        assertDoesNotThrow { save.checkValid() }
+    }
+
+    @Test
+    fun `mixed machine and turret slots validated`() {
+        val save = freshSave().apply {
+            buildSlots = mutableListOf(
+                MachineSlot(MachineKind.RIFLE),
+                TurretSlot(TurretKind.RIFLE)
+            )
+        }
+        assertDoesNotThrow { save.checkValid() }
+    }
+
+    @Test
+    fun `turret with missing upgrade key rejected`() {
+        val save = freshSave().apply {
+            turretUpgrades.clear()
+            buildSlots = mutableListOf(TurretSlot(TurretKind.RIFLE))
+        }
+        // ?: 0 fallback → treated as locked
+        assertThrows<InvalidSaveException> { save.checkValid() }
+    }
+
+    @Test
+    fun `machine with missing upgrade key rejected`() {
+        val save = freshSave().apply {
+            machineUpgrades.clear()
+            buildSlots = mutableListOf(MachineSlot(MachineKind.RIFLE))
+        }
+        assertThrows<InvalidSaveException> { save.checkValid() }
+    }
+
+    // --- Large value edge cases ---
+
+    @Test
+    fun `large credits accepted`() {
+        val save = freshSave().apply { credits = Long.MAX_VALUE }
+        assertDoesNotThrow { save.checkValid() }
+    }
+
+    @Test
+    fun `large credits survive serialization round-trip`() {
+        val save = freshSave().apply { credits = Long.MAX_VALUE }
+        val json = Json.encodeToString(save)
+        val restored = Json.decodeFromString<GameSave>(json)
+        assertEquals(Long.MAX_VALUE, restored.credits)
+    }
+
+    // --- Partial JSON deserialization ---
+
+    @Test
+    fun `JSON with missing optional fields uses defaults`() {
+        // Minimal JSON with only required fields
+        val minimalJson = """{"creationDate":0,"lastAccessedDate":0}"""
+        val lenient = Json { ignoreUnknownKeys = true }
+        val save = lenient.decodeFromString<GameSave>(minimalJson)
+        assertEquals(0L, save.credits)
+        assertEquals(0, save.lastStageCompleted)
+        assertEquals(8, save.machineUpgrades.size)
+        assertEquals(6, save.mainUpgrades.size)
+    }
 }

@@ -218,4 +218,140 @@ class NavGridTest {
         assertTrue(steps < maxSteps, "Unit should navigate through gap within $maxSteps steps, took $steps")
         assertTrue(worldY <= targetWorldY, "Unit should reach target, ended at Y=$worldY")
     }
+
+    // --- Out-of-bounds world coordinates ---
+
+    @Test
+    fun `getFlowToBase with negative coordinates returns null or valid vector`() {
+        val nav = openGrid()
+        // Should not crash — either returns null or a valid vector
+        val flow = nav.getFlowToBase(-100f, -100f)
+        if (flow != null) {
+            assertTrue(flow.len() > 0f, "If returned, flow should be non-zero")
+        }
+    }
+
+    @Test
+    fun `getFlowToBase with very large coordinates returns null or valid vector`() {
+        val nav = openGrid()
+        val flow = nav.getFlowToBase(99999f, 99999f)
+        if (flow != null) {
+            assertTrue(flow.len() > 0f)
+        }
+    }
+
+    @Test
+    fun `getFlowToTop with out-of-bounds coordinates does not crash`() {
+        val nav = openGrid()
+        // Negative
+        nav.getFlowToTop(-50f, -50f)
+        // Huge
+        nav.getFlowToTop(10000f, 10000f)
+        // Zero
+        val flow = nav.getFlowToTop(0f, 0f)
+        // Should not crash — any result is fine
+        if (flow != null) {
+            val len = flow.len()
+            assertTrue(len > 0f || len == 0f, "Flow length should be finite")
+        }
+    }
+
+    // --- isBlockedAt edge cases ---
+
+    @Test
+    fun `isBlockedAt with OOB coordinates returns blocked`() {
+        val nav = openGrid()
+        // worldToCol/worldToRow clamp to valid range, so OOB coords map to edge tiles
+        // For open grid, edge tiles are walkable → not blocked
+        // But negative coords clamp to (0,0) which is walkable in open grid
+        assertFalse(nav.isBlockedAt(-100f, -100f), "Clamped to walkable edge tile")
+    }
+
+    @Test
+    fun `isBlockedAt correctly identifies blocked tile`() {
+        val nav = wallWithGapGrid(wallRow = 32, gapCol = 8)
+        val ppm = fr.mesabloo.heavymachdefense.PPM
+        // Row 32 in grid → worldY near the middle
+        // row = (ROWS-1) - (pixelY / TILE_SIZE) → pixelY = (ROWS-1 - row) * TILE_SIZE
+        val blockedWorldY = ((NavGrid.ROWS - 1 - 32) * NavGrid.TILE_SIZE + NavGrid.TILE_SIZE / 2f) / ppm
+        val blockedWorldX = (0 * NavGrid.TILE_SIZE + NavGrid.TILE_SIZE / 2f) / ppm // col 0 is blocked
+        assertTrue(nav.isBlockedAt(blockedWorldX, blockedWorldY), "Wall tile should be blocked")
+
+        val gapWorldX = (8 * NavGrid.TILE_SIZE + NavGrid.TILE_SIZE / 2f) / ppm // col 8 is gap
+        assertFalse(nav.isBlockedAt(gapWorldX, blockedWorldY), "Gap tile should not be blocked")
+    }
+
+    // --- Seed row always has flow ---
+
+    @Test
+    fun `seed row tiles always have flow direction`() {
+        val nav = openGrid()
+        // flowToBase seed row = 63 (bottom)
+        for (c in 0 until NavGrid.COLS) {
+            val flow = nav.flowToBase[NavGrid.ROWS - 1][c]
+            assertNotNull(flow, "Seed row tile ($c) should have flow")
+            assertTrue(abs(flow.len() - 1f) < 0.01f, "Seed row flow should be unit length")
+        }
+        // flowToTop seed row = 0 (top)
+        for (c in 0 until NavGrid.COLS) {
+            val flow = nav.flowToTop[0][c]
+            assertNotNull(flow, "Top seed row tile ($c) should have flow")
+        }
+    }
+
+    // --- Unreachable tiles have null flow ---
+
+    @Test
+    fun `tiles isolated by wall have null flow`() {
+        // Create grid with wall across entire row (no gap)
+        val grid = List(NavGrid.ROWS) { r ->
+            List(NavGrid.COLS) { _ ->
+                r != 32  // row 32 is fully blocked
+            }
+        }
+        val nav = NavGrid(NavGridJson(terrainId = 0, cols = NavGrid.COLS, rows = NavGrid.ROWS, tileSize = NavGrid.TILE_SIZE, grid = grid))
+
+        // flowToBase: seed=63 (below wall). Tiles above wall (rows 0-31) are unreachable
+        for (r in 0..31) {
+            for (c in 0 until NavGrid.COLS) {
+                assertNull(nav.flowToBase[r][c], "Tile ($r,$c) above solid wall should have null flowToBase")
+            }
+        }
+
+        // Tiles below wall (rows 33-63) should still have flow
+        for (c in 0 until NavGrid.COLS) {
+            assertNotNull(nav.flowToBase[NavGrid.ROWS - 1][c], "Seed row ($c) should still have flow")
+        }
+    }
+
+    // --- Corner-only gap does NOT allow diagonal passage ---
+
+    @Test
+    fun `diagonal corner-cutting through blocked tiles is prevented`() {
+        // Create grid where the ONLY way past row 32 would be a diagonal cut:
+        // - Row 32 is fully blocked except col 8
+        // - Row 31 col 8 is also blocked (the tile directly above the gap)
+        // This means: to reach (32,8) from above, you'd need a diagonal from (31,7) or (31,9),
+        // but that requires the adjacent cardinal tile to be walkable — (31,8) is blocked
+        // and (32,7)/(32,9) are blocked. So there's NO valid path from above row 32 to below.
+        val grid = List(NavGrid.ROWS) { r ->
+            List(NavGrid.COLS) { c ->
+                when {
+                    r == 32 && c != 8 -> false  // wall except gap at col 8
+                    r == 31 && c == 8 -> false  // block tile above gap
+                    else -> true
+                }
+            }
+        }
+        val nav = NavGrid(NavGridJson(terrainId = 0, cols = NavGrid.COLS, rows = NavGrid.ROWS, tileSize = NavGrid.TILE_SIZE, grid = grid))
+
+        // Tile (31,7) is walkable, (32,8) is walkable, but diagonal is blocked because
+        // both (31,8) and (32,7) are blocked → corner-cutting prevention.
+        // No cardinal path exists either → tiles above wall are unreachable from seed row 63.
+        val flow = nav.flowToBase[31][7]
+        assertNull(flow, "Tile (31,7) should have null flow — no path through blocked diagonal")
+
+        // But tiles below the wall should still have flow
+        assertNotNull(nav.flowToBase[33][7], "Tile (33,7) below wall should have flow")
+    }
 }

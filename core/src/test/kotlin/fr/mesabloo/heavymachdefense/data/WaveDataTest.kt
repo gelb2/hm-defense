@@ -99,4 +99,95 @@ class WaveDataTest {
             assertTrue(firstDelay in 1f..10f, "Level $level first delay=$firstDelay out of 1..10 range")
         }
     }
+
+    // --- Out-of-range level values (coercion safety) ---
+
+    @Test
+    fun `level 0 does not crash`() {
+        val result = generateDefaultWaves(0)
+        assertTrue(result.waves.isNotEmpty())
+        result.waves.flatMap { it.groups }.forEach { g ->
+            assertTrue(g.hp > 0)
+            assertTrue(g.count > 0)
+            assertTrue(g.speed > 0f)
+        }
+    }
+
+    @Test
+    fun `negative level does not crash`() {
+        val result = generateDefaultWaves(-10)
+        assertTrue(result.waves.isNotEmpty())
+        result.waves.flatMap { it.groups }.forEach { g ->
+            assertTrue(g.hp > 0)
+            assertTrue(g.count > 0)
+        }
+    }
+
+    @Test
+    fun `level above 80 does not crash`() {
+        val result = generateDefaultWaves(999)
+        assertTrue(result.waves.isNotEmpty())
+        result.waves.flatMap { it.groups }.forEach { g ->
+            assertTrue(g.hp > 0)
+            assertTrue(g.count > 0)
+            val typeNum = g.tankType.toInt()
+            assertTrue(typeNum in 1..32, "Tank type $typeNum out of range")
+        }
+    }
+
+    // --- Wave count monotonicity ---
+
+    @Test
+    fun `wave count never decreases as level increases`() {
+        var prevWaveCount = 0
+        for (level in 1..80) {
+            val waveCount = generateDefaultWaves(level).waves.size
+            assertTrue(waveCount >= prevWaveCount,
+                "Wave count decreased at level $level: $prevWaveCount -> $waveCount")
+            prevWaveCount = waveCount
+        }
+    }
+
+    // --- Speed never zero ---
+
+    @Test
+    fun `no enemy has zero speed at any level`() {
+        for (level in 1..80) {
+            val result = generateDefaultWaves(level)
+            for (wave in result.waves) {
+                for (group in wave.groups) {
+                    assertTrue(group.speed > 0f,
+                        "Level $level has enemy with speed=${group.speed}")
+                }
+            }
+        }
+    }
+
+    // --- Interval bounds ---
+
+    @Test
+    fun `spawn interval never below minimum across all levels`() {
+        for (level in 1..80) {
+            val result = generateDefaultWaves(level)
+            for (wave in result.waves) {
+                for (group in wave.groups) {
+                    assertTrue(group.interval >= 0.8f,
+                        "Level $level has interval=${group.interval}, expected >= 0.8")
+                }
+            }
+        }
+    }
+
+    // --- Subsequent wave delays are larger ---
+
+    @Test
+    fun `subsequent waves have increasing delay within each level`() {
+        for (level in 1..80) {
+            val delays = generateDefaultWaves(level).waves.map { it.delay }
+            for (i in 1 until delays.size) {
+                assertTrue(delays[i] > delays[0],
+                    "Level $level wave $i delay=${delays[i]} not greater than first wave delay=${delays[0]}")
+            }
+        }
+    }
 }

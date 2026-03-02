@@ -78,7 +78,10 @@ class GameWorld(private val terrain: Terrain) : Disposable {
             }
         }
 
-        // Bases render above units (units emerge from behind bases)
+        // Foreground overlays render above units (units pass behind buildings)
+        terrain.foregroundActors.forEach { it.toFront() }
+
+        // Bases render above units and foreground (units emerge from behind bases)
         bodies.forEach { body ->
             if (body.type == BodyDef.BodyType.StaticBody) {
                 (body.userData as? Actor)?.toFront()

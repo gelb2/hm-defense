@@ -44,7 +44,8 @@ OUTPUT_DEBUG_DIR = Path(__file__).parent / "navgrid-debug"
 # ============================================================
 
 # These terrains have no obstacles — force all tiles walkable.
-FORCE_ALL_WALKABLE = {1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
+# Terrain 25: factory buildings rendered as foreground overlay (units pass behind)
+FORCE_ALL_WALKABLE = {1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 25}
 
 # Rectangular region overrides: (row_start, col_start, row_end, col_end) inclusive.
 # Applied AFTER general classification.

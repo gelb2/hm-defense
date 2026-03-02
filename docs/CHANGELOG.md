@@ -1,5 +1,38 @@
 # Changelog
 
+## 2026-03-02 — 죽은 코드 정리 (추가)
+
+- **Batcher + Drawable 제거** (UIWorld.kt, internal/ 디렉토리)
+  - UIWorld에서 매 프레임 빈 SpriteBatch begin/end 호출하던 Batcher 삭제
+  - `internal/Batcher.kt`, `internal/Drawable.kt` 파일 삭제, 디렉토리 정리
+- **MachineModel.toPositionedBody() 삭제** (MachineModel.kt, -68줄)
+  - Scene2D로 대체된 옛 Box2D 조인트 기반 머신 생성 메서드 제거
+  - 미사용 import 10개 정리 (Vector2, Body, BodyDef, Joint, World, MachinePart, PPM 등)
+- **ENEMY_PLANE / SHIPS 에셋 로딩 제거** (StageAssetsManager.kt)
+  - allAtlases()에서 제외 → 매 스테이지 불필요한 TextureAtlas 2개 로딩 방지
+
+## 2026-03-02 — 게임 메카닉 구현
+
+- **적 처치 크레딧 보상** (StageScreen.kt)
+  - 적 사망 시 `maxHp / 10 * crResearchMultiplier` 크레딧 지급
+  - CR_RESEARCH 업그레이드 (1.0~3.0배) 자동 반영
+- **CELL_RESEARCH 채굴 속도** (CellCounter.kt)
+  - `BASE_MINING_SPEED / multiplier` 간격으로 셀 채굴 (1.0~2.2배 가속)
+- **BASE_DEFENSE 기지 HP** (StageScreen.kt)
+  - 아군 기지: upgrades.json의 defense 값 적용 (레벨 1 = 10,000 HP ~ 레벨 7 = 100,000 HP)
+  - 적 기지: 10,000 HP 고정 (기존 500 → 밸런스 조정)
+
+## 2026-03-02 — 안정성 개선 + Coming Soon 팝업
+
+- **크래시 위험 TODO 스텁 제거** (4건)
+  - `TurretBuildSlot.updateBuildingNumber()`: `TODO()` → `building=0` (터렛 미구현)
+  - `BuildMachineIfPossible` 터렛 분기: `TODO()` → early return (셀 차감 방지)
+  - `StageScreen` 빌드/스페셜 슬롯 else 분기: `TODO()` → `continue`
+- **비기능 버튼에 "Coming Soon" 팝업 연결** (4건)
+  - `InGameDialog.showComingSoon()` 메서드 추가
+  - `ShowComingSoon` 재사용 ClickListener 클래스 추가
+  - SupportButton, Help, Leader Board, UpgradeEquipment 버튼에 적용
+
 ## 2026-03-02 — 게임 Pause/Resume
 
 - **SystemMenu 열기 시 전체 게임플레이 정지** (StageScreen.kt, Terrain.kt, SystemMenu.kt)
@@ -7,6 +40,16 @@
   - Box2D 물리, AI 행동트리, 적 스폰, 투사체, 이펙트, 보행 애니메이션 모두 동결
   - UI (메뉴, 볼륨 슬라이더, 버튼)는 정상 작동
   - Resume Game 클릭 시 즉시 재개
+
+## 2026-03-02 — NavGrid 플로우 필드 연속 그래디언트
+
+- **buildFlowField() 그래디언트 개선** (NavGrid.kt)
+  - 기존: 단일 최적 이웃 선택 → 이산 8방향 벡터 (0°, 45°, 90°, ... 45° 양자화)
+  - 변경: Cardinal central difference → 연속 그래디언트
+  - `gradCol = dist[right] - dist[left]`, `gradRow = dist[down] - dist[up]`
+  - Blocked/OOB 이웃은 myDist로 폴백 → 해당 축 기여 0
+  - 결과: 장애물 근처에서 45° 급변 대신 부드러운 곡선 방향
+  - 쌍선형 보간과 결합하여 타일 경계 전환도 매끄러움
 
 ## 2026-03-02 — 몸체 회전 필터 + NavGrid 지형 수정
 

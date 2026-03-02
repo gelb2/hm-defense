@@ -8,17 +8,19 @@
 
 런타임에 `NotImplementedError` 던지는 코드. 세이브에 터렛 슬롯이 있으면 즉시 크래시.
 
-- [ ] **TurretBuildSlot.updateBuildingNumber()** — `TODO("Not yet implemented")` (`ui/stage/slots/SlotKinds.kt:166`)
-- [ ] **BuildMachineIfPossible 터렛 분기** — `is TurretBuildSlot -> TODO()` (`listeners/stage/BuildMachineIfPossible.kt:33`)
+- [x] ~~**TurretBuildSlot.updateBuildingNumber()** — `TODO("Not yet implemented")`~~ (building=0으로 대체)
+- [x] ~~**BuildMachineIfPossible 터렛 분기** — `is TurretBuildSlot -> TODO()`~~ (else→return으로 대체, 셀 차감 방지)
+- [x] ~~**StageScreen 빌드 슬롯 else 분기** — `else -> TODO()`~~ (continue로 대체)
+- [x] ~~**StageScreen 스페셜 슬롯 else 분기** — `else -> TODO()`~~ (continue로 대체)
 
 ## 2. 비기능 UI (버튼 있으나 동작 없음)
 
 화면에 보이고 누를 수 있지만 아무 일도 안 하는 요소들.
 
-- [ ] **SupportButton** — 리스너 주석 처리 (`screens/StageSelectionScreen.kt:73`)
-- [ ] **SystemMenu Help 버튼** — 리스너 없음 (`ui/stage/dialog/SystemMenu.kt:82`)
-- [ ] **SystemMenu Leader Board 버튼** — 리스너 없음 (`ui/stage/dialog/SystemMenu.kt:83`)
-- [ ] **UpgradeEquipment 버튼** — addListener 없이 배치, 시각 전용 (`screens/StageScreen.kt:327`)
+- [x] ~~**SupportButton** — 리스너 주석 처리~~ ("Coming Soon" 팝업 연결)
+- [x] ~~**SystemMenu Help 버튼** — 리스너 없음~~ ("Coming Soon" 팝업 연결)
+- [x] ~~**SystemMenu Leader Board 버튼** — 리스너 없음~~ ("Coming Soon" 팝업 연결)
+- [x] ~~**UpgradeEquipment 버튼** — addListener 없이 배치~~ ("Coming Soon" 팝업 연결)
 
 ## 3. 미구현 게임 메카닉
 
@@ -31,13 +33,13 @@
 - [ ] 터렛 에셋(atlas) 매 스테이지 로딩되지만 렌더링 안 됨
 
 ### 업그레이드 효과 미반영
-- [ ] **CELL_RESEARCH** — multiplier 읽지만 CellCounter 채굴 속도에 미적용 (하드코딩 `MINING_SPEED=0.05f`)
-- [ ] **CR_RESEARCH** — multiplier 읽지만 크레딧 보상에 미적용
+- [x] ~~**CELL_RESEARCH** — multiplier 읽지만 CellCounter 채굴 속도에 미적용~~ (BASE_MINING_SPEED/multiplier 적용)
+- [x] ~~**CR_RESEARCH** — multiplier 읽지만 크레딧 보상에 미적용~~ (적 처치 보상에 적용)
 - [ ] **BASE_CANNON** — 업그레이드 시 스킨만 변경, 실제 사격 안 함 (`BaseEntity`: `range=null`, `attackSpeed=0f`)
-- [ ] **BASE_DEFENSE** — 업그레이드 시 스킨만 변경, 기지 HP 항상 500 하드코딩
+- [x] ~~**BASE_DEFENSE** — 업그레이드 시 스킨만 변경, 기지 HP 항상 500 하드코딩~~ (upgrades.json defense 값 적용, 적 기지 10000 HP)
 
 ### 경제 시스템
-- [ ] **크레딧 획득** — 적 처치 시 크레딧 보상 없음 (소비만 가능)
+- [x] ~~**크레딧 획득** — 적 처치 시 크레딧 보상 없음~~ (maxHp/10 * CR_RESEARCH 보상 구현)
 - [ ] **스페셜 보충** — DEV 모드 99개 외에 보충 수단 없음
 
 ### 미구현 스킬
@@ -54,14 +56,14 @@
 - [ ] `PreparationAssetsManager.bodyRegion()` / `feetRegion()` — 동일 문제
 
 ### 세이브/데이터 역직렬화
-- [ ] `SavesSelectionScreen` — `Json.decodeFromString` try-catch 없음, 손상 세이브 시 크래시 (`:44`)
-- [ ] `StageScreen` — upgrades/builds/specials JSON 로딩에 try-catch 없음 (`:106-110`)
-- [ ] `GameSave.checkValid()` — 정의만 있고 호출하는 곳 없음 (`:78`)
+- [x] ~~`SavesSelectionScreen` — `Json.decodeFromString` try-catch 없음~~ (try-catch + checkValid() 추가)
+- [ ] `StageScreen` — upgrades/builds/specials JSON 로딩에 try-catch 없음 (`:106-110`) — 번들 에셋이라 실질 위험 낮음
+- [x] ~~`GameSave.checkValid()` — 정의만 있고 호출하는 곳 없음~~ (SavesSelectionScreen에서 호출)
 
 ### 안전하지 않은 접근
 - [ ] `SlotKinds.kt:91` — 이중 `!!` 강제 언래핑, 세이브에 키 없으면 NPE
-- [ ] `MapList.kt:14` — `assert`만으로 레벨 범위 검증, release 빌드에서 비활성
-- [ ] `BuildMachineIfPossible.kt:25` — 빠른 더블탭 시 cells 음수 가능 (coerceAtLeast 없음)
+- [x] ~~`MapList.kt:14` — `assert`만으로 레벨 범위 검증~~ (require로 대체)
+- [x] ~~`BuildMachineIfPossible.kt:25` — 빠른 더블탭 시 cells 음수 가능~~ (balance guard 추가)
 
 ## 5. 미사용 / 죽은 코드
 
@@ -70,13 +72,13 @@
 - [x] ~~`SoundEffectManager` — 미사용 클래스 + `TODO()` dispose~~ (삭제됨)
 - [x] ~~`DialogKind` enum — 어디서도 참조 안 됨~~ (파일 삭제됨)
 - [x] ~~`CancelButton` — 정의만 있고 인스턴스 없음~~ (삭제됨)
-- [ ] `MachineModel.toPositionedBody()` — 호출부 주석 처리됨 (`data/models/MachineModel.kt:137`)
+- [x] ~~`MachineModel.toPositionedBody()` — 호출부 주석 처리됨~~ (메서드 + 미사용 import 삭제)
 - [x] ~~`entities/Machine.kt` 주석 블록 — 60줄 옛 Ashley ECS 코드~~ (삭제됨)
 - [x] ~~`Slots.kt` — 빈 파일, 패키지 선언만~~ (파일 삭제됨)
-- [ ] `Batcher` + `Drawable` — Scene2D로 대체된 커스텀 렌더링 레이어 (`internal/`)
+- [x] ~~`Batcher` + `Drawable` — Scene2D로 대체된 커스텀 렌더링 레이어~~ (UIWorld에서 제거, 파일 삭제, internal/ 디렉토리 삭제)
 - [x] ~~`MachinePart.LEFT_FOOT/RIGHT_FOOT` — 미사용 enum 값~~ (삭제됨)
-- [ ] `GameSave.turretUpgrades` — 읽거나 쓰는 곳 없음
-- [ ] `ENEMY_PLANE` / `SHIPS` 에셋 — 매 스테이지 로딩하지만 사용처 없음
+- [ ] `GameSave.turretUpgrades` — 읽거나 쓰는 곳 없음 (터렛 시스템 구현 시까지 유지)
+- [x] ~~`ENEMY_PLANE` / `SHIPS` 에셋 — 매 스테이지 로딩하지만 사용처 없음~~ (allAtlases()에서 제거, 메모리 절약)
 - [x] ~~`Radar Border.init` — 자식 추가 주석 처리~~ (삭제됨)
 
 ## 6. 기존 진행 중 항목
@@ -85,4 +87,4 @@
 - [ ] 창 리사이즈 시 UI 깨짐 — FitViewport 리사이즈 처리 문제
 - [ ] 유닛 충돌 회피 잔여 떨림 — 대량(20+) 밀집 시. 파라미터 튜닝 또는 적 유닛 vel.x 유지 검토
 - [ ] NavGrid 패스파인딩 — 32×32 타일 그리드 기반 A* 구현
-- [ ] **아군 머신 사선 정렬** — 머신이 정방향(90°)이 아닌 수~수십도 기울어진 채 전진. 2중 필터(Flow Field+Rate Limit 240°/s)로도 미해결. 원인 후보: (1) flow field 자체가 사선 방향 반환 (BFS gradient가 대각선 이웃 선택), (2) adjustUnitVelocities의 separation이 실제 이동방향을 변경하지만 시각 회전은 flow field 추적, (3) 발/몸체 Group 회전 시 시각적 불일치 증폭. 추가 조사 필요
+- [ ] **아군 머신 사선 정렬** — 장애물 근처에서 발생 가능. buildFlowField()를 cardinal central difference 연속 그래디언트로 교체 완료. 열린 지형에서는 해결, 장애물 근처 효과는 실행 확인 필요. adjustUnitVelocities의 separation X-force가 2차 원인으로 남아있음

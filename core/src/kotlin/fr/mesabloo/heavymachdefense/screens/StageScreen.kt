@@ -97,6 +97,7 @@ class StageScreen(
     private var gameEndTimer = 0f
     private var isVictory = false
     private var gameResultOverlay: GameResultOverlay? = null
+    private var navGrid: NavGrid? = null
 
     private val gameObjects = mutableListOf<GameObject>()
 
@@ -390,6 +391,7 @@ class StageScreen(
         this.terrain.setScrollFocus(true)
 
         this.gameWorld = GameWorld(this.terrain)
+        this.navGrid = NavGrid.load(level)
 
         createTerrainBody(this.gameWorld)
         val basesResult = createBases(this.gameWorld, this.upgrades, this::save)
@@ -460,6 +462,7 @@ class StageScreen(
 
         // Walking animation controls body velocity (step-based movement)
         machine.physicsBody = body
+        machine.navGrid = this.navGrid
         machine.startWalkingAnimation(kind.speed)
 
         // Register AI entity
@@ -1002,7 +1005,7 @@ class StageScreen(
 
         tank.physicsBody = body
 
-        val entity = EnemyTankEntity(tank, body, this.gameObjects, info.speed)
+        val entity = EnemyTankEntity(tank, body, this.gameObjects, info.speed, this.navGrid)
         entity.behaviorTree = this.btreeParser.parse(this.btreeSource, entity)
         entity.onShoot = { shooter, target ->
             val shooterPos = shooter.getPosition().cpy().scl(PPM)

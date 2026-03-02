@@ -9,12 +9,14 @@ import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable
 import com.badlogic.gdx.physics.box2d.Body
 import fr.mesabloo.heavymachdefense.PPM
 import fr.mesabloo.heavymachdefense.data.MachineKind
+import fr.mesabloo.heavymachdefense.data.NavGrid
 import fr.mesabloo.heavymachdefense.data.models.MachineModel
 import fr.mesabloo.heavymachdefense.managers.assets.StageAssetsManager
 import fr.mesabloo.heavymachdefense.managers.assets.stageAssetsManager
 
 class Machine(val kind: MachineKind, level: Int) : Group() {
     var physicsBody: Body? = null
+    var navGrid: NavGrid? = null
 
     var hp: Int = 100
     var maxHp: Int = 100
@@ -123,7 +125,13 @@ class Machine(val kind: MachineKind, level: Int) : Group() {
                         pBody.setLinearVelocity(0f, 0f)
                         return false
                     }
-                    pBody.setLinearVelocity(pBody.linearVelocity.x, moveSpeed / PPM)
+                    val speed = moveSpeed / PPM
+                    val flow = machine.navGrid?.getFlowToTop(pBody.position.x, pBody.position.y)
+                    if (flow != null) {
+                        pBody.setLinearVelocity(flow.x * speed, flow.y * speed)
+                    } else {
+                        pBody.setLinearVelocity(pBody.linearVelocity.x, speed)
+                    }
                     return false
                 }
             })
@@ -165,6 +173,9 @@ class Machine(val kind: MachineKind, level: Int) : Group() {
                 elapsed += delta
                 val cycleTime = elapsed % fullCycle
 
+                val bSpeed = burstSpeed / PPM
+                val flow = machine.navGrid?.getFlowToTop(pBody.position.x, pBody.position.y)
+
                 when {
                     // Left foot step: animate left foot, move forward, sway right
                     cycleTime < stepDuration -> {
@@ -172,7 +183,11 @@ class Machine(val kind: MachineKind, level: Int) : Group() {
                         val frameIdx = (phaseTime / frameDuration).toInt().coerceIn(0, frames.size - 1)
                         lFoot.drawable = TextureRegionDrawable(frames[frameIdx])
 
-                        pBody.setLinearVelocity(pBody.linearVelocity.x, burstSpeed / PPM)
+                        if (flow != null) {
+                            pBody.setLinearVelocity(flow.x * bSpeed, flow.y * bSpeed)
+                        } else {
+                            pBody.setLinearVelocity(pBody.linearVelocity.x, bSpeed)
+                        }
 
                         val progress = phaseTime / stepDuration
                         actor.x += MathUtils.sin(progress * MathUtils.PI) * swayAmount
@@ -187,7 +202,11 @@ class Machine(val kind: MachineKind, level: Int) : Group() {
                         val frameIdx = (phaseTime / frameDuration).toInt().coerceIn(0, frames.size - 1)
                         rFoot.drawable = TextureRegionDrawable(framesFlipped[frameIdx])
 
-                        pBody.setLinearVelocity(pBody.linearVelocity.x, burstSpeed / PPM)
+                        if (flow != null) {
+                            pBody.setLinearVelocity(flow.x * bSpeed, flow.y * bSpeed)
+                        } else {
+                            pBody.setLinearVelocity(pBody.linearVelocity.x, bSpeed)
+                        }
 
                         val progress = phaseTime / stepDuration
                         actor.x -= MathUtils.sin(progress * MathUtils.PI) * swayAmount

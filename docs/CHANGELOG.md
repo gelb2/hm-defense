@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-03-02 — 유닛테스트 도입 + 크레딧 보상
+
+- **유닛테스트 인프라 구축** (build.gradle, core/src/test/)
+  - JUnit 5 + kotlin-test-junit5 + gdx-backend-headless 의존성 추가
+  - `./gradlew :core:test` 로 실행 가능
+- **GameSave 테스트** (16개) — checkValid() 경계값, 직렬화 round-trip, 기본값
+- **WaveData 테스트** (8개) — 전 레벨(1-80) 유효성, 결정론성, 스탯 스케일링
+- **WaveManager 테스트** (8개) — 스폰 타이밍, 멀티웨이브, 루프, 엣지케이스
+- **NavGrid 테스트** (14개) — 플로우필드 방향, 벽+갭 라우팅, 유닛 이동 시뮬레이션(오실레이션/스턱 검출)
+- **스테이지 클리어 크레딧 보상** (StageScreen.kt)
+  - 승리 시 `(500 + level × 100) × CR_RESEARCH` 크레딧 지급
+  - 세이브 항상 persist (기존: 신규 스테이지일 때만)
+
 ## 2026-03-02 — 죽은 코드 정리 (추가)
 
 - **Batcher + Drawable 제거** (UIWorld.kt, internal/ 디렉토리)

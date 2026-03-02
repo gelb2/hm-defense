@@ -1141,13 +1141,22 @@ class StageScreen(
                 gameEnded = true
                 gameEndTimer = 0f
                 isVictory = true
+
+                // Stage clear credit reward: base 500 + 100 per level, scaled by CR_RESEARCH
+                val clearBonus = ((500L + this.level * 100L) * this.crResearchMultiplier).toLong()
+                this.save.credits += clearBonus
+                Gdx.app.debug(this.javaClass.simpleName, "Stage ${this.level} clear bonus: $clearBonus credits")
+
                 // Unlock next stage if this is the furthest cleared
                 if (this.level > this.save.lastStageCompleted) {
                     this.save.lastStageCompleted = this.level.coerceAtMost(79)
-                    Gdx.app.getPreferences(GameSave.PREFERENCES_PATH).flush {
-                        this[this@StageScreen.saveIndex.toString()] = Json.encodeToString(this@StageScreen.save)
-                    }
                 }
+
+                // Persist save (credits + stage progress)
+                Gdx.app.getPreferences(GameSave.PREFERENCES_PATH).flush {
+                    this[this@StageScreen.saveIndex.toString()] = Json.encodeToString(this@StageScreen.save)
+                }
+
                 showGameResult(true)
             }
         }

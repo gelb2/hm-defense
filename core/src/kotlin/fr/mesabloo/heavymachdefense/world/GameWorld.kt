@@ -99,20 +99,20 @@ class GameWorld(private val terrain: Terrain) : Disposable {
         private const val MIN_VELOCITY_THRESHOLD = 0.01f
 
         // --- Proximity-based avoidance (gentle steering for nearby units) ---
-        /** Edge-to-edge distance (world units) within which units repel each other laterally */
+        /** Edge-to-edge distance (world units) within which units repel each other */
         private const val INFLUENCE_RADIUS = 2.0f
-        /** Lateral repulsion strength per nearby unit */
-        private const val LATERAL_REPULSION = 0.3f
+        /** Separation strength per nearby unit */
+        private const val SEPARATION_STRENGTH = 0.3f
         /** Forward slowdown strength (0=none, 1=full stop when directly blocked) */
         private const val FORWARD_SLOWDOWN = 0.6f
         /** Edge-to-edge Y distance for forward blockage detection */
         private const val FORWARD_CHECK_DIST = 3.0f
-        /** Maximum lateral speed as fraction of original forward speed */
-        private const val MAX_LATERAL_RATIO = 0.8f
+        /** Maximum separation speed as fraction of original speed */
+        private const val MAX_SEPARATION_RATIO = 0.8f
         /** Minimum forward speed ratio */
         private const val MIN_FORWARD_RATIO = 0.1f
-        /** Lateral velocity smoothing factor (0=no change, 1=instant) */
-        private const val LATERAL_SMOOTHING = 0.3f
+        /** Velocity smoothing factor (0=no change, 1=instant) */
+        private const val VELOCITY_SMOOTHING = 0.3f
 
         // --- Overlap separation (velocity-based, replaces setTransform) ---
         /** Edge-to-edge buffer maintained between units (~1.6px) */
@@ -125,6 +125,55 @@ class GameWorld(private val terrain: Terrain) : Disposable {
         // --- Off-screen spawn: visibility boundaries (pixels) ---
         private const val VISIBLE_BOTTOM_PX = 0f
         private const val VISIBLE_TOP_PX = 2048f
+
+        // --- Spatial hash ---
+        /** Cell size for spatial hash (world units). Must be >= INFLUENCE_RADIUS. */
+        private const val CELL_SIZE = 4.0f
+    }
+
+    // ---------------------------------------------------------------
+    // Spatial hash for efficient neighbor lookups
+    // ---------------------------------------------------------------
+
+    private val spatialCells = HashMap<Long, MutableList<Int>>(64)
+    private val cellListPool = mutableListOf<MutableList<Int>>()
+
+    private fun spatialKey(x: Float, y: Float): Long {
+        val cx = (x / CELL_SIZE).toInt()
+        val cy = (y / CELL_SIZE).toInt()
+        return (cx.toLong() shl 32) or (cy.toLong() and 0xFFFFFFFFL)
+    }
+
+    /** Build spatial hash from current unit positions. */
+    private fun buildSpatialHash(units: List<Body>) {
+        // Return lists to pool
+        for (list in spatialCells.values) {
+            list.clear()
+            cellListPool.add(list)
+        }
+        spatialCells.clear()
+
+        for (i in units.indices) {
+            val pos = units[i].position
+            val key = spatialKey(pos.x, pos.y)
+            val list = spatialCells.getOrPut(key) {
+                if (cellListPool.isNotEmpty()) cellListPool.removeAt(cellListPool.size - 1)
+                else mutableListOf()
+            }
+            list.add(i)
+        }
+    }
+
+    /** Query neighbors within ±1 cell of the given position. Returns indices into units list. */
+    private fun queryNeighbors(x: Float, y: Float, callback: (Int) -> Unit) {
+        val cx = (x / CELL_SIZE).toInt()
+        val cy = (y / CELL_SIZE).toInt()
+        for (dx in -1..1) {
+            for (dy in -1..1) {
+                val key = ((cx + dx).toLong() shl 32) or ((cy + dy).toLong() and 0xFFFFFFFFL)
+                spatialCells[key]?.forEach { callback(it) }
+            }
+        }
     }
 
     // ---------------------------------------------------------------
@@ -132,16 +181,17 @@ class GameWorld(private val terrain: Terrain) : Disposable {
     // ---------------------------------------------------------------
 
     /**
-     * Single system controlling all lateral unit movement via velocity.
+     * Steering-based velocity adjustment system.
      *
-     * For each unit, computes two forces:
-     * 1. **Proximity repulsion** — gentle steering away from nearby units (on-screen moving only)
-     * 2. **Overlap separation** — stronger push when units actually overlap (all units)
+     * For each unit, computes:
+     * 1. **Directional separation** — push away from nearby units, preferring
+     *    the direction perpendicular to movement (avoids fighting flow field)
+     * 2. **Overlap separation** — stronger push when units actually overlap
+     * 3. **Forward slowdown** — reduce speed when blocked ahead
      *
-     * Both are applied as velocity, eliminating the position-teleport jitter
-     * that occurred when setTransform-based separation fought with velocity-based movement.
+     * Uses spatial hashing for O(n·k) neighbor queries instead of O(n²).
      *
-     * Runs BEFORE [World.step] so the adjusted velocity takes effect
+     * Runs BEFORE [World.step] so adjusted velocities take effect
      * in the current frame's physics simulation.
      */
     private fun adjustUnitVelocities() {
@@ -157,9 +207,21 @@ class GameWorld(private val terrain: Terrain) : Disposable {
         }
 
         val n = units.size
-        if (n < 2) return
+        if (n < 2) {
+            // Clean up stale velocity entries when no units to process
+            if (lastVelocity.isNotEmpty()) lastVelocity.clear()
+            return
+        }
+
+        // Purge velocity history for destroyed bodies
+        if (lastVelocity.size > n) {
+            lastVelocity.keys.retainAll(units.toSet())
+        }
 
         val terrainMaxX = TERRAIN_WIDTH / PPM
+
+        // Build spatial hash for efficient neighbor queries
+        buildSpatialHash(units)
 
         for (i in 0 until n) {
             val body = units[i]
@@ -172,14 +234,33 @@ class GameWorld(private val terrain: Terrain) : Disposable {
 
             val yPixels = y * PPM
             val isOffScreen = yPixels < VISIBLE_BOTTOM_PX || yPixels > VISIBLE_TOP_PX
-            val isMoving = vel.x * vel.x + vel.y * vel.y >= MIN_VELOCITY_THRESHOLD * MIN_VELOCITY_THRESHOLD
+            val speedSq = vel.x * vel.x + vel.y * vel.y
+            val isMoving = speedSq >= MIN_VELOCITY_THRESHOLD * MIN_VELOCITY_THRESHOLD
+            val totalSpeed = if (isMoving) sqrt(speedSq) else 0f
 
-            var lateralPush = 0f       // proximity-based repulsion
+            // Velocity direction (unit vector). For perpendicular separation calculation.
+            val velDirX: Float
+            val velDirY: Float
+            if (isMoving && totalSpeed > 0.001f) {
+                velDirX = vel.x / totalSpeed
+                velDirY = vel.y / totalSpeed
+            } else {
+                velDirX = 0f
+                velDirY = 1f  // Default: assume upward for allies, downward handled below
+            }
+
+            // Perpendicular to velocity direction (for directional separation)
+            val perpX = -velDirY
+            val perpY = velDirX
+
+            var separationX = 0f       // directional separation push
+            var separationY = 0f
             var forwardScale = 1f      // forward slowdown
-            var overlapPush = 0f       // overlap separation (accumulated)
+            var overlapPushX = 0f      // overlap separation (accumulated)
 
-            for (j in 0 until n) {
-                if (j == i) continue
+            // Query nearby units via spatial hash
+            queryNeighbors(x, y) { j ->
+                if (j == i) return@queryNeighbors
                 val other = units[j]
                 val oActor = other.userData as Actor
                 val ohw = oActor.width / 2f / PPM
@@ -197,29 +278,40 @@ class GameWorld(private val terrain: Terrain) : Disposable {
                     val pushDir = if (dx > 0.001f) -1f
                                   else if (dx < -0.001f) 1f
                                   else if (i % 2 == 0) -1f else 1f
-                    overlapPush += pushDir * overlapX
+                    overlapPushX += pushDir * overlapX
                 }
 
-                // --- Proximity repulsion + forward slowdown (on-screen moving only) ---
-                if (!isMoving || isOffScreen) continue
+                // --- Directional separation + forward slowdown (on-screen moving only) ---
+                if (!isMoving || isOffScreen) return@queryNeighbors
 
-                if (gapX > INFLUENCE_RADIUS && gapY > INFLUENCE_RADIUS) continue
+                if (gapX > INFLUENCE_RADIUS && gapY > INFLUENCE_RADIUS) return@queryNeighbors
 
                 val xProx = ((INFLUENCE_RADIUS - gapX) / INFLUENCE_RADIUS).coerceIn(0f, 1f)
                 val yProx = ((INFLUENCE_RADIUS - gapY) / INFLUENCE_RADIUS).coerceIn(0f, 1f)
 
                 if (xProx > 0f && yProx > 0f) {
+                    // Direction from this unit to neighbor
                     val dx = ox - x
-                    val pushDir = if (dx > 0.001f) -1f
-                                  else if (dx < -0.001f) 1f
-                                  else if (i % 2 == 0) -1f else 1f
-                    lateralPush += pushDir * xProx * yProx * LATERAL_REPULSION
+                    val dy = oy - y
+
+                    // Project neighbor offset onto perpendicular axis
+                    // Positive dot = neighbor is to the "right" of our movement direction
+                    val perpDot = dx * perpX + dy * perpY
+
+                    // Push in the opposite perpendicular direction
+                    val pushSign = if (perpDot > 0.001f) -1f
+                                   else if (perpDot < -0.001f) 1f
+                                   else if (i % 2 == 0) -1f else 1f
+
+                    val strength = xProx * yProx * SEPARATION_STRENGTH
+                    separationX += perpX * pushSign * strength
+                    separationY += perpY * pushSign * strength
                 }
 
-                val fwd = if (vel.y > 0f) 1f else -1f
-                val forwardDist = (oy - y) * fwd
-                if (forwardDist > 0f && gapX < 0f) {
-                    val edgeGapY = (forwardDist - hh - ohh).coerceAtLeast(0f)
+                // Forward slowdown: check if neighbor is ahead in our movement direction
+                val toOtherAlongVel = (ox - x) * velDirX + (oy - y) * velDirY
+                if (toOtherAlongVel > 0f && gapX < 0f) {
+                    val edgeGapY = (abs(oy - y) - hh - ohh).coerceAtLeast(0f)
                     val fProx = (1f - edgeGapY / FORWARD_CHECK_DIST).coerceIn(0f, 1f)
                     if (fProx > 0f) {
                         forwardScale = minOf(forwardScale, 1f - fProx * FORWARD_SLOWDOWN)
@@ -229,40 +321,52 @@ class GameWorld(private val terrain: Terrain) : Disposable {
 
             // Convert overlap to velocity
             val sepFactor = if (isOffScreen) OFFSCREEN_SEPARATION_VEL else OVERLAP_SEPARATION_VEL
-            val overlapVel = overlapPush * sepFactor
+            val overlapVel = overlapPushX * sepFactor
 
             when {
                 isMoving && !isOffScreen -> {
-                    // On-screen moving: proximity repulsion + overlap separation + forward control
-                    // Use total speed so diagonal flow-field movement is handled correctly
-                    val totalSpeed = sqrt(vel.x * vel.x + vel.y * vel.y)
+                    // On-screen moving: directional separation + overlap + forward control
 
-                    val proximityLat = (lateralPush * totalSpeed)
-                        .coerceIn(-totalSpeed * MAX_LATERAL_RATIO, totalSpeed * MAX_LATERAL_RATIO)
-                    val latVel = vel.x + proximityLat + overlapVel   // preserve flow field X
-                    val fwdVel = vel.y * forwardScale.coerceAtLeast(MIN_FORWARD_RATIO)  // preserve flow field Y
-
-                    val clampedLatVel = when {
-                        latVel < 0f && x - hw < 0.1f -> 0f
-                        latVel > 0f && x + hw > terrainMaxX - 0.1f -> 0f
-                        else -> latVel
+                    // Scale separation by speed and clamp
+                    val sepMag = sqrt(separationX * separationX + separationY * separationY)
+                    val maxSep = totalSpeed * MAX_SEPARATION_RATIO
+                    var scaledSepX = separationX * totalSpeed
+                    var scaledSepY = separationY * totalSpeed
+                    if (sepMag * totalSpeed > maxSep) {
+                        val scale = maxSep / (sepMag * totalSpeed)
+                        scaledSepX *= scale
+                        scaledSepY *= scale
                     }
 
-                    val prevLat = lastLateralVel[body] ?: 0f
-                    val smoothedLatVel = prevLat + (clampedLatVel - prevLat) * LATERAL_SMOOTHING
-                    lastLateralVel[body] = smoothedLatVel
+                    // Apply forward slowdown to velocity
+                    val effectiveForward = forwardScale.coerceAtLeast(MIN_FORWARD_RATIO)
+                    var targetX = vel.x * effectiveForward + scaledSepX + overlapVel
+                    var targetY = vel.y * effectiveForward + scaledSepY
 
-                    var finalX = smoothedLatVel
-                    var finalY = fwdVel
-                    val totalSpeedSq = finalX * finalX + finalY * finalY
-                    val maxSpeed = totalSpeed * 1.2f // allow slight overshoot for overlap resolution
-                    if (totalSpeedSq > maxSpeed * maxSpeed) {
-                        val scale = maxSpeed / sqrt(totalSpeedSq)
-                        finalX *= scale
-                        finalY *= scale
+                    // Clamp at terrain boundaries (X only)
+                    if (targetX < 0f && x - hw < 0.1f) targetX = 0f
+                    if (targetX > 0f && x + hw > terrainMaxX - 0.1f) targetX = 0f
+
+                    // Smooth velocity transition to reduce jitter
+                    val prev = lastVelocity[body]
+                    if (prev != null) {
+                        targetX = prev[0] + (targetX - prev[0]) * VELOCITY_SMOOTHING
+                        targetY = prev[1] + (targetY - prev[1]) * VELOCITY_SMOOTHING
+                    }
+                    lastVelocity.getOrPut(body) { FloatArray(2) }.also {
+                        it[0] = targetX; it[1] = targetY
                     }
 
-                    body.setLinearVelocity(finalX, finalY)
+                    // Clamp total speed to ~120% of original (allow slight overshoot for overlap)
+                    val finalSpeedSq = targetX * targetX + targetY * targetY
+                    val maxSpeed = totalSpeed * 1.2f
+                    if (finalSpeedSq > maxSpeed * maxSpeed) {
+                        val scale = maxSpeed / sqrt(finalSpeedSq)
+                        targetX *= scale
+                        targetY *= scale
+                    }
+
+                    body.setLinearVelocity(targetX, targetY)
                 }
                 isOffScreen && abs(overlapVel) > 0.001f -> {
                     // Off-screen: raw fast separation velocity (no smoothing)
@@ -280,16 +384,20 @@ class GameWorld(private val terrain: Terrain) : Disposable {
                         overlapVel > 0f && x + hw > terrainMaxX - 0.1f -> 0f
                         else -> overlapVel
                     }
-                    val prevLat = lastLateralVel[body] ?: 0f
-                    val smoothed = prevLat + (clampedVel - prevLat) * LATERAL_SMOOTHING
-                    lastLateralVel[body] = smoothed
+                    val prev = lastVelocity[body]
+                    val prevX = prev?.get(0) ?: 0f
+                    val smoothed = prevX + (clampedVel - prevX) * VELOCITY_SMOOTHING
+                    lastVelocity.getOrPut(body) { FloatArray(2) }.also {
+                        it[0] = smoothed; it[1] = 0f
+                    }
                     body.setLinearVelocity(smoothed, 0f)
                 }
             }
         }
     }
 
-    private val lastLateralVel = HashMap<Body, Float>()
+    /** Per-body velocity history for smoothing. Stores [x, y] of last adjusted velocity. */
+    private val lastVelocity = HashMap<Body, FloatArray>()
 
     override fun dispose() {
         this.world.dispose()

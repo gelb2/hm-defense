@@ -45,7 +45,7 @@ OUTPUT_DEBUG_DIR = Path(__file__).parent / "navgrid-debug"
 
 # These terrains have no obstacles — force all tiles walkable.
 # Terrain 25: factory buildings rendered as foreground overlay (units pass behind)
-FORCE_ALL_WALKABLE = {1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 25}
+FORCE_ALL_WALKABLE = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 25}
 
 # Rectangular region overrides: (row_start, col_start, row_end, col_end) inclusive.
 # Applied AFTER general classification.
@@ -126,10 +126,82 @@ OVERRIDES = {
             (57, 15, 57, 15),   # Collapsed terrain tip
         ],
     },
+    19: {
+        # Grassland with water inlet and dark structures.
+        # Water on right side (rows 11-28), water+structures on left (rows 31-49).
+        "all_walkable_then_block": [
+            # Right side water inlet
+            (11, 15, 13, 15),   # Right edge col 15
+            (14, 14, 16, 15),   # Right edge cols 14-15
+            (17, 14, 17, 14),   # Right col 14
+            (18, 14, 19, 15),   # Right cols 14-15
+            (20, 14, 21, 14),   # Right col 14
+            (22, 14, 23, 15),   # Right cols 14-15
+            (24, 15, 28, 15),   # Right col 15
+            # Left side water + structures complex
+            (31, 0, 32, 0),     # Left col 0
+            (33, 0, 33, 1),     # Left cols 0-1
+            (34, 0, 34, 2),     # Left cols 0-2
+            (35, 0, 35, 3),     # Left cols 0-3
+            (36, 0, 36, 4),     # Left cols 0-4
+            (37, 0, 38, 5),     # Water cols 0-5 (dark structures + water)
+            (39, 2, 40, 6),     # Dark + water cols 2-6
+            (41, 0, 42, 6),     # Dark + water cols 0-6
+            (43, 0, 43, 5),     # Dark + water cols 0-5
+            (44, 3, 44, 5),     # Water cols 3-5
+            (45, 2, 45, 4),     # Water cols 2-4
+            (46, 0, 46, 3),     # Dark + water cols 0-3
+            (47, 0, 47, 3),     # Water cols 0-3
+            (48, 0, 48, 1),     # Water cols 0-1
+            (49, 0, 49, 0),     # Water col 0
+        ],
+    },
     21: {
-        # Canyon with bridge: ensure central bridge corridor is walkable.
-        "force_walkable": [
-            (13, 5, 19, 9),    # Central bridge corridor
+        # Canyon with central bridge — precise water boundaries.
+        # Water walls form a canyon shape; bridge spans the narrowest section.
+        "all_walkable_then_block": [
+            # Top half — left canyon water wall
+            (4, 0, 4, 0),
+            (5, 0, 5, 1),
+            (6, 0, 6, 2),
+            (7, 0, 8, 3),
+            (9, 0, 22, 4),     # Main left wall (includes bridge area)
+            (23, 0, 23, 2),
+            (24, 0, 24, 1),
+            (25, 0, 25, 0),
+            # Top half — right canyon water wall
+            (2, 15, 2, 15),
+            (3, 14, 4, 15),
+            (5, 13, 6, 15),
+            (7, 12, 7, 15),
+            (8, 11, 8, 15),
+            (9, 10, 20, 15),   # Main right wall (includes bridge area)
+            (21, 10, 21, 13),  # Widening below bridge
+            (22, 10, 22, 14),
+            (23, 11, 25, 15),
+            (26, 12, 26, 15),
+            (27, 13, 27, 15),
+            (28, 14, 29, 15),
+            (30, 15, 30, 15),
+            # Bottom half — left canyon water wall
+            (33, 0, 34, 0),
+            (35, 0, 36, 1),
+            (37, 0, 44, 2),
+            (45, 1, 45, 3),    # Shifted right
+            (46, 0, 50, 3),
+            (51, 0, 51, 4),    # Wider at row 51
+            (52, 0, 54, 3),
+            (55, 0, 55, 2),
+            (56, 0, 57, 1),
+            (58, 0, 58, 0),
+            # Bottom half — right canyon water wall
+            (45, 15, 45, 15),
+            (46, 14, 46, 15),
+            (47, 13, 49, 15),
+            (50, 12, 52, 15),
+            (53, 13, 56, 15),
+            (57, 14, 58, 15),
+            (59, 15, 60, 15),
         ],
     },
     22: {
@@ -206,6 +278,16 @@ OVERRIDES = {
             (43, 0, 43, 2),     # Upper-left bottom edge
             (43, 15, 43, 15),   # Upper-right bottom tip
             (44, 0, 44, 0),     # Left edge
+        ],
+    },
+    27: {
+        # Grassland with lake/water on left side.
+        "all_walkable_then_block": [
+            (13, 0, 13, 2),    # Top edge
+            (14, 0, 23, 3),    # Main lake body
+            (24, 0, 25, 2),    # Narrowing
+            (26, 0, 35, 1),    # Narrow left wall
+            (36, 0, 37, 0),    # Bottom edge
         ],
     },
     26: {

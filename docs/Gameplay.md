@@ -112,81 +112,178 @@
 | Shotgun | 380 px/s | — |
 | Tanker | 300 px/s | explode-01 |
 
-## 유닛 충돌 회피 시스템 (GameWorld.kt)
+## 스티어링 + 유닛 충돌 회피 시스템
 
-유닛(머신, 적 탱크)의 이동과 겹침 방지를 단일 velocity 기반 시스템으로 관리한다.
+유닛(머신, 적 탱크)의 이동과 겹침 방지를 velocity 기반 스티어링 시스템으로 관리한다.
 
-### 아키텍처: Velocity-Only
+### 아키텍처: Velocity-Only + Steering Concepts
 
 ```
 매 프레임 실행 순서:
-1. Machine.Action.act() → vel = (prev_vel.x, burstSpeed/PPM)  [vel.x 유지]
-2. adjustUnitVelocities() → vel 수정 (repulsion + overlap separation)
+1. 행동트리 → walk()/stopInPlace() → speedFactor 가감속 → body.setLinearVelocity()
+2. adjustUnitVelocities() → 방향성 separation + overlap separation + forward slowdown
 3. world.step(1/60) → 속도 기반 위치 이동
 4. Position sync → body.position → actor.position + terrain X 클램프
 ```
 
-모든 lateral 이동이 velocity를 통해 이루어지며, setTransform(위치 텔레포트)를 사용하지 않는다.
-초기 구현에서 velocity와 setTransform 두 시스템이 매 프레임 충돌하여 떨림이 발생했고,
-이를 velocity-only로 통합하여 해결했다.
+모든 이동이 velocity를 통해 이루어지며, setTransform(위치 텔레포트)를 사용하지 않는다.
+gdx-ai SteeringBehavior를 직접 사용하지 않고, 동일한 스티어링 개념을 기존 직접 velocity 제어 패턴에 통합했다.
 
-### 두 가지 힘
+### 가감속 시스템 (Arrive 행동)
 
-**1. Proximity Repulsion** (화면 내 이동 중인 유닛만)
-
-인접 유닛으로부터 연속적 반발 벡터를 누적. 유닛 간 edge-to-edge 거리가 INFLUENCE_RADIUS(2.0wu, ~32px) 내일 때 작동.
+유닛은 즉시 최대 속도가 아닌 가감속 곡선으로 이동한다.
 
 ```
-xProx = clamp((INFLUENCE_RADIUS - gapX) / INFLUENCE_RADIUS, 0, 1)
-yProx = clamp((INFLUENCE_RADIUS - gapY) / INFLUENCE_RADIUS, 0, 1)
-lateralPush += pushDir * xProx * yProx * LATERAL_REPULSION(0.3)
+speedFactor: 0.0 (정지) ↔ 1.0 (최대 속도)
+가속: speedFactor += ACCEL_RATE * dt → ~0.3초에 풀스피드
+감속: speedFactor -= DECEL_RATE * dt → ~0.2초에 정지
 ```
 
-전방 감속: X축으로 겹치면서 Y축 전방에 있는 유닛이 있으면 forward speed 감쇠 (FORWARD_SLOWDOWN=0.6).
+- **적 유닛**: walk()에서 가속, stopInPlace()에서 Arrive 스타일 감속
+  - 감속 중에도 flow field 방향 유지 (갑작스런 정지 방지)
+  - EMP 마비 시 speedFactor=0 리셋 → 마비 해제 후 부드럽게 재가속
+- **아군 머신**: smooth/step 이동 모두 speedFactor 적용
+  - step 이동(발 애니메이션)에서 sway도 speedFactor에 비례
+
+### 경로 탐색: NavGrid Flow Field
+
+8방향 BFS(cardinal + diagonal)로 flow field를 생성하고, 쌍선형 보간으로 타일 경계를 부드럽게 전환한다.
+
+```
+타일 중심 좌표에서 4개 이웃 타일의 flow 벡터를 가중 평균:
+  f(x,y) = Σ weight_i × flow_i / Σ weight_i
+  weight = bilinear coefficient (서브타일 위치 기반)
+```
+
+- 대각선 이동 비용 √2 (정확한 최단 경로)
+- 코너 커팅 방지: 대각선 이동 시 인접 두 cardinal 타일 모두 walkable 필요
+
+### 충돌 회피: 세 가지 힘
+
+**1. 방향성 Separation** (화면 내 이동 중인 유닛만)
+
+이동 방향에 수직인 축으로 인접 유닛을 밀어낸다 (flow field 방향 보존).
+
+```
+perpendicular = (-velDir.y, velDir.x)  // 속도 벡터에 수직
+perpDot = dot(neighbor_offset, perpendicular)
+pushSign = opposite of perpDot sign
+separation += perpendicular × pushSign × proximity × SEPARATION_STRENGTH(0.3)
+```
 
 **2. Overlap Separation** (모든 유닛: 이동/정지, 화면 내/외)
 
 실제로 겹친 유닛을 속도로 밀어내는 힘. gapX < SEPARATION_BUFFER(0.1wu) && gapY < 0 일 때 작동.
 
 ```
-overlapVel = overlapPush * OVERLAP_SEPARATION_VEL(3.0)    // 화면 내
-overlapVel = overlapPush * OFFSCREEN_SEPARATION_VEL(30.0)  // 화면 밖
+overlapVel = overlapPush × OVERLAP_SEPARATION_VEL(3.0)    // 화면 내
+overlapVel = overlapPush × OFFSCREEN_SEPARATION_VEL(30.0)  // 화면 밖
 ```
 
-### 스무딩
+**3. Forward Slowdown** (화면 내 이동 중인 유닛만)
 
-lateral velocity에 프레임 간 스무딩 적용 (LATERAL_SMOOTHING=0.3). HashMap<Body, Float>으로 이전 프레임 값 보존.
-Machine.Action은 vel.x를 유지하므로 스무딩 값이 다음 프레임까지 누적된다.
+이동 방향 전방에 유닛이 있으면 감속. 이동 방향 벡터 기반 dot product로 "전방" 판정.
+
+```
+toOtherAlongVel = dot(to_neighbor, velDir)
+forwardScale = 1 - proximity × FORWARD_SLOWDOWN(0.6)
+```
+
+### 공간 해싱 (Spatial Hashing)
+
+O(n²) → O(n·k) 이웃 탐색 최적화 (k = 셀당 평균 유닛 수).
+
+```
+CELL_SIZE = 4.0 wu (~64px)
+key = (floor(x/CELL_SIZE) << 32) | floor(y/CELL_SIZE)
+query: ±1 cell (3×3 = 9 cells 검사)
+```
+
+### XY 스무딩
+
+X축과 Y축 모두 프레임 간 스무딩 적용 (VELOCITY_SMOOTHING=0.3).
+HashMap<Body, FloatArray[2]>로 이전 프레임 [x, y] 값 보존.
+파괴된 Body 엔트리는 매 프레임 정리 (메모리 릭 방지).
+
+### 몸체 회전 (Body Rotation)
+
+유닛과 머신의 스프라이트가 이동 방향을 따라 자연스럽게 회전한다.
+적 탱크와 아군 머신은 구조적 차이로 인해 다른 필터 전략을 사용한다.
+
+**적 탱크** (EnemyTankEntity) — **4중 필터**:
+
+```
+Layer 1 — Flow Field Direction (노이즈 원천 차단)
+  NavGrid의 쌍선형 보간된 flow 방향을 시각 회전 타겟으로 사용.
+  collision avoidance로 인한 velocity noise가 시각 회전에 영향을 주지 않음.
+
+Layer 2 — EMA Smoothing (잔여 노이즈 필터)
+  방향 벡터에 지수이동평균 적용 (λ=8, α≈0.125/frame, half-life ≈ 0.087s).
+  셀 경계에서의 flow 방향 점프도 부드럽게 전환.
+
+Layer 3 — Angular Dead Zone with Hysteresis (미세 진동 차단)
+  enter threshold: 8° (이 이상 차이나면 회전 시작)
+  exit threshold: 3° (이 이하면 회전 정지)
+  히스테리시스 밴드가 경계 근처 떨림 방지.
+
+Layer 4 — Rate-Limited Rotation — 180°/s
+```
+
+- 포탑(weaponImage)은 독립적으로 타겟을 조준 (body 기준 상대 회전)
+- 정지 시 마지막 방향 유지, 마비(EMP) 시 회전 중단
+- EMA+Dead Zone이 효과적인 이유: 포탑이 독립 회전하므로 몸체 회전은 순수 장식적 → 느려도 무방
+
+**아군 머신** (MachineEntity) — **2중 필터**:
+
+```
+Layer 1 — Flow Field Direction (적과 동일)
+Layer 2 — Rate-Limited Rotation — 240°/s
+```
+
+- 전체 Group(body+feet+weapons)이 함께 회전 → 정렬 불일치가 즉시 가시적
+- EMA/Dead Zone을 사용하면 aimAt()→walk() 전환 시 ~0.5초 "crab-walking" 발생
+- 240°/s의 빠른 턴레이트로 타겟 소실 후 즉시 flow 방향 복귀 (30° 차이 → 0.125초)
+- Flow field 자체가 이미 쌍선형 보간으로 부드러워 추가 스무딩 불필요
+
+**참고한 선진 사례:**
+- Context Steering (Andrew Firth, Game AI Pro 2) — interest/danger map 패턴
+- ORCA (UNC GAMMA Lab) — 진동 없는 상호 회피 수학적 보장
+- Frame-Rate Independent Damping (Rory Driscoll) — EMA 감쇠 공식
+- iforce2d Box2D Rotating to Angle — angular hysteresis 패턴
+- Dota 2 Turn Rate System — turn rate 기반 시각 디커플링
 
 ### 오프스크린 스폰
 
 유닛은 화면 밖에서 스폰되어 걸어서 진입한다:
 - 아군: Y=-200px (terrain 하단 밖), 적: Y=2250px (terrain 상단 밖)
-- 화면 밖(Y<0 또는 Y>2048): proximity repulsion 스킵, overlap separation만 강하게 적용 (×30)
+- 화면 밖(Y<0 또는 Y>2048): directional separation 스킵, overlap separation만 강하게 적용 (×30)
 - 기지(StaticBody)를 toFront()로 유닛 위에 렌더링 → 건물에서 나오는 연출
 
 ### 경계 처리
 
 - terrain X 경계: velocity 클램프 + position 하드 클램프 (벽 밖 돌출 방지)
-- 정지 중(vel.y≈0) 겹침: 부드러운 분리 속도 부여
+- 정지 중(speed≈0) 겹침: 부드러운 분리 속도 부여
 
 ### 상수 요약
 
 | 상수 | 값 | 역할 |
 |------|---|------|
 | INFLUENCE_RADIUS | 2.0 wu | 반발 작동 범위 (~32px) |
-| LATERAL_REPULSION | 0.3 | 반발 강도 |
+| SEPARATION_STRENGTH | 0.3 | 방향성 분리 강도 |
 | FORWARD_SLOWDOWN | 0.6 | 전방 감속 강도 |
-| MAX_LATERAL_RATIO | 0.8 | 최대 횡이동 비율 (전진속도 대비) |
-| LATERAL_SMOOTHING | 0.3 | 횡속도 스무딩 계수 |
+| MAX_SEPARATION_RATIO | 0.8 | 최대 분리이동 비율 (전진속도 대비) |
+| VELOCITY_SMOOTHING | 0.3 | XY 속도 스무딩 계수 |
 | OVERLAP_SEPARATION_VEL | 3.0 | 겹침→속도 변환 (화면 내) |
 | OFFSCREEN_SEPARATION_VEL | 30.0 | 겹침→속도 변환 (화면 밖) |
 | SEPARATION_BUFFER | 0.1 wu | 유닛 간 유지 간격 (~1.6px) |
+| CELL_SIZE | 4.0 wu | 공간 해시 셀 크기 (~64px) |
+| ACCEL_RATE | 3.3 | 가속률 (~0.3초에 풀스피드) |
+| DECEL_RATE | 5.0 | 감속률 (~0.2초에 정지) |
 
-### 알려진 제한 / TODO
+### 알려진 제한
 
-- 대량 유닛(20+) 밀집 시 잔여 떨림 존재 — 파라미터 튜닝 또는 구조 개선 필요
-- 적 유닛(EnemyTank)은 vel.x=0 고정 — Machine과 동일한 vel.x 유지 적용 검토
+- Machine sway(actor.x +=)가 물리 위치 동기화에 의해 덮어써짐 — 시각적 영향만, 물리에는 무영향
+- 적 유닛 velocity는 btree 실행 후 world.step 전에 설정 → 1프레임 지연 (실질적 영향 미미)
 
 ## 터렛 (Turrets) — 6종
 

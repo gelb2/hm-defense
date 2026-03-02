@@ -1,5 +1,49 @@
 # Changelog
 
+## 2026-03-02 — 몸체 회전 필터 + NavGrid 지형 수정
+
+- **적 탱크 몸체 회전 — 4중 필터** (EnemyTankEntity.kt)
+  - Layer 1: Flow field 방향 — 쌍선형 보간된 NavGrid flow를 시각 회전에 사용 (velocity noise 원천 차단)
+  - Layer 2: EMA 방향 스무딩 — 지수이동평균 (λ=8, α≈0.125, half-life≈0.087s)
+  - Layer 3: Angular dead zone with hysteresis — enter 8° / exit 3° (미세 진동 차단)
+  - Layer 4: Rate-limited rotation — 180°/s
+  - 포탑(weaponImage)은 독립적으로 타겟을 조준 (body 기준 상대 회전)
+- **아군 머신 몸체 회전 — 2중 필터** (MachineEntity.kt)
+  - Layer 1: Flow field 방향 (적과 동일)
+  - Layer 2: Rate-limited rotation — 240°/s (적보다 빠름)
+  - EMA/Dead Zone 미적용 — 전체 Group이 회전(body+feet+weapons)하여 정렬 불일치가 즉시 가시적
+  - aimAt() 즉시 스냅 → 타겟 소실 후 240°/s로 빠르게 flow 방향 복귀
+  - 참고: Context Steering, ORCA, Rory Driscoll EMA, iforce2d hysteresis, Dota 2 turn rate
+- **NavGrid 지형 4건 수정** (generate_navgrid.py)
+  - Terrain 6: FORCE_ALL_WALKABLE 추가 (순수 초원인데 자동 분류 오류)
+  - Terrain 19: 물 웅덩이 + 구조물 복합 영역 수동 블록 지정
+  - Terrain 21(Stage 14): 협곡 양 벽의 물 경계를 정밀 all_walkable_then_block으로 재작성
+  - Terrain 27: 좌측 호수 영역 수동 블록 지정
+  - 전 27개 navgrid JSON 재생성 + BFS 연결성 검증 통과
+
+## 2026-03-02 — 스티어링 시스템 전면 도입
+
+- **NavGrid 8방향 BFS + 쌍선형 보간** (NavGrid.kt)
+  - 4방향 → 8방향(대각선 포함) BFS로 업그레이드, float 거리 (√2 대각선 비용)
+  - 대각선 코너 커팅 방지 (인접 cardinal 타일 walkable 여부 확인)
+  - getFlowToBase/getFlowToTop에 쌍선형 보간 적용: 타일 경계에서 4개 이웃 벡터를 가중 평균
+  - 보간 불가 시(blocked 타일 인접) discrete 조회 폴백
+  - 재사용 Vector2로 프레임당 GC 부하 제거
+- **가감속 시스템** (EnemyTankEntity.kt, Machine.kt, MachineEntity.kt)
+  - speedFactor 0.0↔1.0 곡선: accelRate=3.3(~0.3초 가속), decelRate=5.0(~0.2초 감속)
+  - 적 유닛: walk()에서 가속, stopInPlace()에서 Arrive 스타일 감속
+  - 아군 머신: smooth 이동(Tanker 등) + step 이동(발 애니메이션) 모두 speedFactor 적용
+  - MachineEntity.stopInPlace()는 velocity 직접 제로화 대신 Machine Action의 감속에 위임
+  - EMP 마비 시 speedFactor=0 리셋 (마비 해제 후 부드러운 재가속)
+- **adjustUnitVelocities 리팩토링** (GameWorld.kt)
+  - **공간 해싱**: O(n²) → O(n·k) 이웃 탐색 (CELL_SIZE=4.0wu, HashMap 기반)
+  - **방향성 Separation**: 속도 벡터에 수직인 방향으로 밀침 (flow field 방향 보존)
+  - **전방 감속**: 이동 방향 벡터 기반 (기존 vel.y 부호 → dot product)
+  - **XY 스무딩**: X축뿐 아니라 Y축도 프레임 간 스무딩 (FloatArray[2])
+  - **메모리 릭 수정**: 파괴된 Body의 lastVelocity 엔트리 정리 (retainAll)
+  - 상수 리네이밍: LATERAL_REPULSION → SEPARATION_STRENGTH, LATERAL_SMOOTHING → VELOCITY_SMOOTHING
+- **알려진 제한**: Machine sway(actor.x +=)가 물리 위치 동기화로 덮어써지는 기존 이슈 유지
+
 ## 2026-03-02 — NavGrid 지형 장애물 회피 + Foreground 오버레이
 
 - **NavGrid 시스템 구현** (NavGrid.kt, generate_navgrid.py)

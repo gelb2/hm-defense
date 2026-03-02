@@ -85,3 +85,4 @@
 - [ ] 창 리사이즈 시 UI 깨짐 — FitViewport 리사이즈 처리 문제
 - [ ] 유닛 충돌 회피 잔여 떨림 — 대량(20+) 밀집 시. 파라미터 튜닝 또는 적 유닛 vel.x 유지 검토
 - [ ] NavGrid 패스파인딩 — 32×32 타일 그리드 기반 A* 구현
+- [ ] **아군 머신 사선 정렬** — 머신이 정방향(90°)이 아닌 수~수십도 기울어진 채 전진. 2중 필터(Flow Field+Rate Limit 240°/s)로도 미해결. 원인 후보: (1) flow field 자체가 사선 방향 반환 (BFS gradient가 대각선 이웃 선택), (2) adjustUnitVelocities의 separation이 실제 이동방향을 변경하지만 시각 회전은 flow field 추적, (3) 발/몸체 Group 회전 시 시각적 불일치 증폭. 추가 조사 필요

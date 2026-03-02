@@ -1,5 +1,6 @@
 package fr.mesabloo.heavymachdefense.managers.assets
 
+import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.audio.Sound
 import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.g2d.TextureAtlas
@@ -19,6 +20,12 @@ class StageAssetsManager : Disposable {
             getBackgroundForLevel(level).let {
                 val nb = it.toString().padStart(2, '0')
                 Pair("gfx/terrains/$nb/01.jpg", "gfx/terrains/$nb/02.jpg")
+            }
+
+        private fun foregrounds(level: Int): Pair<String, String> =
+            getBackgroundForLevel(level).let {
+                val nb = it.toString().padStart(2, '0')
+                Pair("gfx/terrains/$nb/01-fg.png", "gfx/terrains/$nb/02-fg.png")
             }
 
         const val MACHINE_BODIES = "gfx/models/machines/bodies.atlas"
@@ -195,6 +202,7 @@ class StageAssetsManager : Disposable {
 
     private fun allTextures() = this.stageLevel?.let {
         val (bg1, bg2) = backgrounds(it)
+        val (fg1, fg2) = foregrounds(it)
 
         listOf(
             bg1,
@@ -222,6 +230,9 @@ class StageAssetsManager : Disposable {
             UI.BUILD_SLOT_COVER,
             UI.BUILD_QUEUE_ITEM_BACKGROUND,
             UI.BUILD_QUEUE_GAUGE
+        ) + listOfNotNull(
+            fg1.takeIf { Gdx.files.internal(it).exists() },
+            fg2.takeIf { Gdx.files.internal(it).exists() }
         )
     } ?: listOf()
 
@@ -266,9 +277,12 @@ class StageAssetsManager : Disposable {
     override fun dispose() {
         if (this.stageLevel != null) {
             val (bg1, bg2) = backgrounds(this.stageLevel!!)
-
             assetManager.unload(bg1)
             assetManager.unload(bg2)
+
+            val (fg1, fg2) = foregrounds(this.stageLevel!!)
+            if (assetManager.isLoaded(fg1)) assetManager.unload(fg1)
+            if (assetManager.isLoaded(fg2)) assetManager.unload(fg2)
         }
         ALL_WEAPON_SOUND_PATHS.forEach {
             if (assetManager.isLoaded(it)) assetManager.unload(it)
@@ -287,6 +301,13 @@ class StageAssetsManager : Disposable {
 
     fun background(): Pair<TextureRegion, TextureRegion>? = this.stageLevel?.let { level ->
         backgrounds(level).let { Pair(this.get(it.first), this.get(it.second)) }
+    }
+
+    fun foreground(): Pair<TextureRegion, TextureRegion>? = this.stageLevel?.let { level ->
+        val (fg1, fg2) = foregrounds(level)
+        if (assetManager.isLoaded(fg1) && assetManager.isLoaded(fg2))
+            Pair(this.get(fg1), this.get(fg2))
+        else null
     }
 }
 

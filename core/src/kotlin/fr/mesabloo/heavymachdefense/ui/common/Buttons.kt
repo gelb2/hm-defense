@@ -12,13 +12,6 @@ class BackButton : ImageButton(
     }
 )
 
-class CancelButton : ImageButton(
-    ImageButtonStyle().also {
-        it.up = TextureRegionDrawable(buttonAssetsManager.texture(Button.CANCEL, false))
-        it.down = TextureRegionDrawable(buttonAssetsManager.texture(Button.CANCEL, true))
-    }
-)
-
 class CloseButton : ImageButton(
     ImageButtonStyle().also {
         it.up = TextureRegionDrawable(buttonAssetsManager.texture(Button.CLOSE, false))

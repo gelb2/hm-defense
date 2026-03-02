@@ -32,9 +32,3 @@ class BackgroundMusicManager : Disposable {
 }
 
 val backgroundMusicManager by lazy { BackgroundMusicManager() }
-
-class SoundEffectManager : Disposable {
-    override fun dispose() {
-        TODO("Not yet implemented")
-    }
-}

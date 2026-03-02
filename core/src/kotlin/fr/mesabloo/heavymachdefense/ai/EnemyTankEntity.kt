@@ -5,13 +5,15 @@ import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.physics.box2d.Body
 import fr.mesabloo.heavymachdefense.PPM
+import fr.mesabloo.heavymachdefense.data.NavGrid
 import fr.mesabloo.heavymachdefense.ui.stage.EnemyTank
 
 class EnemyTankEntity(
     val tank: EnemyTank,
     val body: Body,
     private val allObjects: MutableList<GameObject>,
-    private val moveSpeed: Float
+    private val moveSpeed: Float,
+    private val navGrid: NavGrid? = null
 ) : GameObject() {
 
     var paralyzedTimer: Float = 0f
@@ -33,7 +35,14 @@ class EnemyTankEntity(
     override fun walk() {
         if (paralyzedTimer > 0f) return
         tank.walking = true
-        body.setLinearVelocity(0f, -moveSpeed / PPM) // walk DOWNWARD
+
+        val speed = moveSpeed / PPM
+        val flow = navGrid?.getFlowToBase(body.position.x, body.position.y)
+        if (flow != null) {
+            body.setLinearVelocity(flow.x * speed, flow.y * speed)
+        } else {
+            body.setLinearVelocity(0f, -speed) // fallback: straight down
+        }
     }
 
     override fun stopInPlace() {

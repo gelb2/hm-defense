@@ -78,7 +78,10 @@ class GameWorld(private val terrain: Terrain) : Disposable {
             }
         }
 
-        // Bases render above units (units emerge from behind bases)
+        // Foreground overlays render above units (units pass behind buildings)
+        terrain.foregroundActors.forEach { it.toFront() }
+
+        // Bases render above units and foreground (units emerge from behind bases)
         bodies.forEach { body ->
             if (body.type == BodyDef.BodyType.StaticBody) {
                 (body.userData as? Actor)?.toFront()
@@ -169,7 +172,7 @@ class GameWorld(private val terrain: Terrain) : Disposable {
 
             val yPixels = y * PPM
             val isOffScreen = yPixels < VISIBLE_BOTTOM_PX || yPixels > VISIBLE_TOP_PX
-            val isMoving = abs(vel.y) >= MIN_VELOCITY_THRESHOLD
+            val isMoving = vel.x * vel.x + vel.y * vel.y >= MIN_VELOCITY_THRESHOLD * MIN_VELOCITY_THRESHOLD
 
             var lateralPush = 0f       // proximity-based repulsion
             var forwardScale = 1f      // forward slowdown
@@ -231,13 +234,13 @@ class GameWorld(private val terrain: Terrain) : Disposable {
             when {
                 isMoving && !isOffScreen -> {
                     // On-screen moving: proximity repulsion + overlap separation + forward control
-                    val speed = abs(vel.y)
-                    val fwd = if (vel.y > 0f) 1f else -1f
+                    // Use total speed so diagonal flow-field movement is handled correctly
+                    val totalSpeed = sqrt(vel.x * vel.x + vel.y * vel.y)
 
-                    val proximityLat = (lateralPush * speed)
-                        .coerceIn(-speed * MAX_LATERAL_RATIO, speed * MAX_LATERAL_RATIO)
-                    val latVel = proximityLat + overlapVel
-                    val fwdVel = fwd * speed * forwardScale.coerceAtLeast(MIN_FORWARD_RATIO)
+                    val proximityLat = (lateralPush * totalSpeed)
+                        .coerceIn(-totalSpeed * MAX_LATERAL_RATIO, totalSpeed * MAX_LATERAL_RATIO)
+                    val latVel = vel.x + proximityLat + overlapVel   // preserve flow field X
+                    val fwdVel = vel.y * forwardScale.coerceAtLeast(MIN_FORWARD_RATIO)  // preserve flow field Y
 
                     val clampedLatVel = when {
                         latVel < 0f && x - hw < 0.1f -> 0f
@@ -252,7 +255,7 @@ class GameWorld(private val terrain: Terrain) : Disposable {
                     var finalX = smoothedLatVel
                     var finalY = fwdVel
                     val totalSpeedSq = finalX * finalX + finalY * finalY
-                    val maxSpeed = speed * 1.2f // allow slight overshoot for overlap resolution
+                    val maxSpeed = totalSpeed * 1.2f // allow slight overshoot for overlap resolution
                     if (totalSpeedSq > maxSpeed * maxSpeed) {
                         val scale = maxSpeed / sqrt(totalSpeedSq)
                         finalX *= scale

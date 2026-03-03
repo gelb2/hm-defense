@@ -26,15 +26,13 @@ class MachineEntity(
     /** Current body facing angle in degrees (0°=right, 90°=up). */
     private var facingAngleDeg = 90f  // start facing up
 
+    init {
+        machine.rotation = 90f  // face upward from spawn
+    }
+
     companion object {
         private const val FIXED_DT = 1f / 60f
-        /**
-         * Machine body turn rate (degrees/sec).
-         * Faster than enemy tanks (240 vs 180) because:
-         * - Entire Group rotates (body+feet+weapons) → misalignment is very visible
-         * - aimAt() snaps instantly to target → fast recovery needed after target lost
-         * - Flow field is already smooth (bilinear interpolated) → no extra smoothing needed
-         */
+        /** Turn rate (degrees/sec) for smooth return to default 90° after aimAt(). */
         private const val BODY_TURN_RATE = 240f
     }
 
@@ -52,11 +50,8 @@ class MachineEntity(
 
     override fun walk() {
         machine.walking = true
-        // When no target is locked, rotate body toward movement direction.
-        // When a target exists, aimAt() handles rotation (takes priority).
-        if (!hasTarget) {
-            updateBodyRotation()
-        }
+        // Body stays at default 90° (up) during movement.
+        // Only aimAt() rotates the body to face a target.
     }
 
     override fun stopInPlace() {
@@ -74,43 +69,8 @@ class MachineEntity(
     }
 
     override fun aimDefault() {
-        // Smoothly return to flow field direction, or default upward
-        val flow = machine.navGrid?.getFlowToTop(body.position.x, body.position.y)
-        val targetAngle = if (flow != null) {
-            MathUtils.atan2(flow.y, flow.x) * MathUtils.radiansToDegrees
-        } else {
-            90f // default: face upward
-        }
-        facingAngleDeg = rotateToward(facingAngleDeg, targetAngle, BODY_TURN_RATE * FIXED_DT)
-        machine.rotation = facingAngleDeg
-    }
-
-    // --- Body rotation (2-layer: flow field → rate-limit) ---
-
-    /**
-     * Smoothly rotate machine body toward movement direction.
-     *
-     * Unlike enemy tanks (which use a 4-layer filter with EMA + dead zone),
-     * ally machines use a simpler 2-layer approach:
-     *
-     * Layer 1 — **Flow field direction**: Bilinear-interpolated NavGrid flow
-     *   is already noise-free, so additional EMA smoothing is unnecessary.
-     * Layer 2 — **Rate-limited rotation**: 240°/s. Fast enough to track flow
-     *   field changes and recover quickly after aimAt() snaps to a target.
-     *
-     * EMA and dead zone are omitted because:
-     * - The entire Machine Group rotates (body+feet+weapons) — misalignment
-     *   between facing and movement direction is immediately visible.
-     * - aimAt() instantly snaps rotation to the target. After the target dies,
-     *   EMA lag + dead zone would leave the machine "crab-walking" for ~0.5s.
-     * - The bilinear-interpolated flow field is already smooth enough.
-     */
-    private fun updateBodyRotation() {
-        val flow = machine.navGrid?.getFlowToTop(body.position.x, body.position.y)
-            ?: return  // no flow field → keep current facing
-
-        val targetAngle = MathUtils.atan2(flow.y, flow.x) * MathUtils.radiansToDegrees
-        facingAngleDeg = rotateToward(facingAngleDeg, targetAngle, BODY_TURN_RATE * FIXED_DT)
+        // Smoothly return to default upward (90°) after target lost
+        facingAngleDeg = rotateToward(facingAngleDeg, 90f, BODY_TURN_RATE * FIXED_DT)
         machine.rotation = facingAngleDeg
     }
 

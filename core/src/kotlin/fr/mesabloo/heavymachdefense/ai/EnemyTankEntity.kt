@@ -7,8 +7,6 @@ import com.badlogic.gdx.physics.box2d.Body
 import fr.mesabloo.heavymachdefense.PPM
 import fr.mesabloo.heavymachdefense.data.NavGrid
 import fr.mesabloo.heavymachdefense.ui.stage.EnemyTank
-import kotlin.math.abs
-import kotlin.math.sqrt
 
 class EnemyTankEntity(
     val tank: EnemyTank,
@@ -31,14 +29,9 @@ class EnemyTankEntity(
     /** Speed factor 0.0 (stopped) to 1.0 (full speed). Smoothly transitions. */
     private var speedFactor = 0f
 
-    // --- Body rotation ---
-    /** Current body facing angle in degrees (0°=right, 90°=up, -90°=down). */
-    private var facingAngleDeg = -90f  // start facing down
-    /** EMA-smoothed direction vector (unit vector, avoids velocity noise). */
-    private var smoothedDirX = 0f
-    private var smoothedDirY = -1f  // initial: pointing down
-    /** Hysteresis state: true when actively rotating toward target. */
-    private var isRotating = false
+    init {
+        tank.rotation = -90f  // enemies face downward from spawn
+    }
 
     companion object {
         /** Fixed timestep matching world.step(1/60f) */
@@ -47,18 +40,6 @@ class EnemyTankEntity(
         private const val ACCEL_RATE = 3.3f
         /** Stop in ~0.2s */
         private const val DECEL_RATE = 5.0f
-        /** Body turn rate in degrees per second */
-        private const val BODY_TURN_RATE = 180f
-        /** Minimum speed² (world units) below which body rotation is not updated */
-        private const val MIN_ROTATION_SPEED_SQ = 0.05f * 0.05f
-
-        // --- Rotation smoothing (3-layer filter) ---
-        /** EMA alpha per frame. λ=8 at 60fps → half-life ≈ 0.087s. */
-        private const val ROTATION_EMA_ALPHA = 0.125f
-        /** Start rotating when angle diff exceeds this (degrees). */
-        private const val ROTATION_ENTER_DEG = 8f
-        /** Stop rotating when angle diff drops below this (degrees). */
-        private const val ROTATION_EXIT_DEG = 3f
     }
 
     // --- GameObject abstracts ---
@@ -77,10 +58,7 @@ class EnemyTankEntity(
         if (paralyzedTimer > 0f) return
         tank.walking = true
 
-        // Rotate body toward actual movement direction (velocity from last physics step)
-        updateBodyRotation()
-
-        // Accelerate toward full speed
+        // Body stays at fixed -90° (down). Only weapon rotates via aimAt().
         speedFactor = (speedFactor + ACCEL_RATE * FIXED_DT).coerceAtMost(1f)
         applyFlowVelocity()
     }
@@ -111,69 +89,6 @@ class EnemyTankEntity(
         } else {
             body.setLinearVelocity(0f, -speed) // fallback: straight down
         }
-    }
-
-    // --- Body rotation (3-layer filter: flow field → EMA → dead zone → rate-limit) ---
-
-    /**
-     * Smoothly rotate tank body toward movement direction.
-     *
-     * Layer 1 — **Flow field direction**: Uses the bilinear-interpolated NavGrid flow
-     *   direction instead of noisy post-collision-avoidance velocity. Falls back to
-     *   velocity direction when no flow field is available.
-     * Layer 2 — **EMA smoothing**: Exponential moving average on the direction vector
-     *   filters residual noise (λ=8, half-life ≈ 0.087s).
-     * Layer 3 — **Angular dead zone with hysteresis**: Rotation only activates when
-     *   angle diff > 8° and deactivates when < 3°, preventing micro-oscillations.
-     * Layer 4 — **Rate-limited rotation**: Max 180°/s turn speed.
-     */
-    private fun updateBodyRotation() {
-        // Layer 1: Flow field direction (smooth, bilinear-interpolated, no collision noise)
-        val flow = navGrid?.getFlowToBase(body.position.x, body.position.y)
-        val rawDirX: Float
-        val rawDirY: Float
-        if (flow != null) {
-            rawDirX = flow.x
-            rawDirY = flow.y
-        } else {
-            // Fallback: velocity direction
-            val vel = body.linearVelocity
-            val speedSq = vel.x * vel.x + vel.y * vel.y
-            if (speedSq < MIN_ROTATION_SPEED_SQ) return
-            val invLen = 1f / sqrt(speedSq)
-            rawDirX = vel.x * invLen
-            rawDirY = vel.y * invLen
-        }
-
-        // Layer 2: EMA on direction vector (filters cell-boundary jumps)
-        smoothedDirX += (rawDirX - smoothedDirX) * ROTATION_EMA_ALPHA
-        smoothedDirY += (rawDirY - smoothedDirY) * ROTATION_EMA_ALPHA
-
-        val targetAngle = MathUtils.atan2(smoothedDirY, smoothedDirX) * MathUtils.radiansToDegrees
-
-        // Layer 3: Angular dead zone with hysteresis
-        val angleDiff = abs(shortAngleDist(facingAngleDeg, targetAngle))
-        if (!isRotating && angleDiff > ROTATION_ENTER_DEG) {
-            isRotating = true
-        } else if (isRotating && angleDiff < ROTATION_EXIT_DEG) {
-            isRotating = false
-        }
-        if (!isRotating) return
-
-        // Layer 4: Rate-limited rotation
-        facingAngleDeg = rotateToward(facingAngleDeg, targetAngle, BODY_TURN_RATE * FIXED_DT)
-        tank.rotation = facingAngleDeg
-    }
-
-    /** Shortest angular distance from [from] to [to] in degrees, range (-180, 180]. */
-    private fun shortAngleDist(from: Float, to: Float): Float =
-        ((to - from) % 360f + 540f) % 360f - 180f
-
-    /** Rotate [current] toward [target] by at most [maxDelta] degrees. */
-    private fun rotateToward(current: Float, target: Float, maxDelta: Float): Float {
-        val diff = shortAngleDist(current, target)
-        return if (abs(diff) <= maxDelta) target
-        else current + maxDelta * if (diff > 0f) 1f else -1f
     }
 
     override fun aimAt(target: GameObject) {

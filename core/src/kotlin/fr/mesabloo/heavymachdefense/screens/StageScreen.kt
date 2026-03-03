@@ -200,16 +200,16 @@ class StageScreen(
             scrollpane = it
 
             val yOffset = 180f
+            val hpGaugeReserve = 35f  // HP gauge height (32) + gap (3)
 
-            it.setBounds(128f, yOffset, 512f, UI_HEIGHT - yOffset)
+            it.setBounds(128f, yOffset, 512f, UI_HEIGHT - yOffset - hpGaugeReserve)
             it.setSmoothScrolling(true)
             it.setScrollbarsVisible(false)
             it.setScrollingDisabled(true, false)
             it.setOverscroll(false, false)
 
             it.layout()
-            it.scrollTo(0f, 0f, 512f, 1024f - yOffset)
-            //it.layout()
+            it.scrollTo(0f, 0f, 512f, UI_HEIGHT - yOffset - hpGaugeReserve)
         })
 
         this.background.addActor(HpGauges(this::playerLife, this::enemyLife).also {

@@ -11,9 +11,13 @@ import fr.mesabloo.heavymachdefense.managers.fontManager
 import kotlin.reflect.KMutableProperty0
 import kotlin.reflect.KProperty0
 
-class CellCounter(private val maxCells: KProperty0<Long>, private val currentCells: KMutableProperty0<Long>) : Group() {
+class CellCounter(
+    private val maxCells: KProperty0<Long>,
+    private val currentCells: KMutableProperty0<Long>,
+    private val miningSpeedMultiplier: Float = 1f
+) : Group() {
     private companion object {
-        const val MINING_SPEED = 0.05f
+        const val BASE_MINING_SPEED = 0.05f
     }
 
     private val current = Label("0", Label.LabelStyle().also {
@@ -50,7 +54,7 @@ class CellCounter(private val maxCells: KProperty0<Long>, private val currentCel
 
     override fun act(delta: Float) {
         if (!this.addCellsTask.isScheduled) {
-            cellMiningTimer.scheduleTask(this.addCellsTask, 0f, MINING_SPEED)
+            cellMiningTimer.scheduleTask(this.addCellsTask, 0f, BASE_MINING_SPEED / miningSpeedMultiplier)
         }
 
         this.current.setText(this.currentCells.get().toString())

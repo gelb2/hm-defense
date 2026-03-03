@@ -4,6 +4,7 @@ import com.badlogic.gdx.scenes.scene2d.Touchable
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import fr.mesabloo.heavymachdefense.MainGame
 import fr.mesabloo.heavymachdefense.data.GameSave
+import fr.mesabloo.heavymachdefense.listeners.ShowComingSoon
 import fr.mesabloo.heavymachdefense.listeners.stage_selection.BackToSaves
 import fr.mesabloo.heavymachdefense.listeners.stage_selection.LoadStage
 import fr.mesabloo.heavymachdefense.listeners.stage_selection.SelectOrLoadStage
@@ -70,7 +71,7 @@ class StageSelectionScreen(
         })
         this.background.addActor(SupportButton().also {
             it.setPosition(UI_WIDTH * 2f / 4f - it.width / 2f, 30f)
-            //it.addListener(DeleteSave(this))
+            it.addListener(ShowComingSoon(this.ui))
         })
         this.background.addActor(OkButton().also {
             it.setPosition(UI_WIDTH * 3f / 4f - it.width / 2f - 32f, 30f)

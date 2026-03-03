@@ -6,6 +6,8 @@ import fr.mesabloo.heavymachdefense.PPM
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.util.LinkedList
+import kotlin.math.floor
+import kotlin.math.sqrt
 
 /**
  * Navigation grid for terrain obstacle avoidance.
@@ -23,6 +25,7 @@ class NavGrid(private val data: NavGridJson) {
         const val TILE_SIZE = 32  // pixels
         const val COLS = 16
         const val ROWS = 64
+        private val SQRT2 = sqrt(2f)
 
         private val json = Json { ignoreUnknownKeys = true }
 
@@ -58,22 +61,105 @@ class NavGrid(private val data: NavGridJson) {
 
     /**
      * Get the flow direction toward the ally base (enemies use this).
+     * Uses bilinear interpolation for smooth direction transitions between tiles.
+     *
+     * **Warning:** The returned Vector2 is a shared instance. Read its values immediately;
+     * do not store a reference across frames.
      */
     fun getFlowToBase(worldX: Float, worldY: Float): Vector2? {
-        val col = worldToCol(worldX)
-        val row = worldToRow(worldY)
-        if (row < 0 || row >= ROWS || col < 0 || col >= COLS) return null
-        return flowToBase[row][col]
+        return getInterpolatedFlow(worldX, worldY, flowToBase)
     }
 
     /**
      * Get the flow direction toward the enemy base (ally machines use this).
+     * Uses bilinear interpolation for smooth direction transitions between tiles.
+     *
+     * **Warning:** The returned Vector2 is a shared instance. Read its values immediately;
+     * do not store a reference across frames.
      */
     fun getFlowToTop(worldX: Float, worldY: Float): Vector2? {
-        val col = worldToCol(worldX)
-        val row = worldToRow(worldY)
+        return getInterpolatedFlow(worldX, worldY, flowToTop)
+    }
+
+    /**
+     * Bilinear interpolation of flow field vectors.
+     * Blends the 4 surrounding tile vectors weighted by the unit's sub-tile position,
+     * producing smooth curves instead of abrupt direction changes at tile boundaries.
+     *
+     * Falls back to discrete tile lookup if near blocked tiles.
+     */
+    private fun getInterpolatedFlow(worldX: Float, worldY: Float, field: Array<Array<Vector2?>>): Vector2? {
+        val pixelX = worldX * PPM
+        val pixelY = worldY * PPM
+
+        // Continuous coordinates (tile center = integer + 0.5)
+        val fx = pixelX / TILE_SIZE - 0.5f
+        val fy = (ROWS - 1).toFloat() - (pixelY / TILE_SIZE - 0.5f)
+
+        val col0 = floor(fx).toInt()
+        val row0 = floor(fy).toInt()
+        val col1 = col0 + 1
+        val row1 = row0 + 1
+
+        // Interpolation weights
+        val tx = fx - col0
+        val ty = fy - row0
+
+        // Sample 4 neighboring tiles (null = blocked or out of bounds)
+        val f00 = safeFlow(row0, col0, field)
+        val f10 = safeFlow(row0, col1, field)
+        val f01 = safeFlow(row1, col0, field)
+        val f11 = safeFlow(row1, col1, field)
+
+        // Count how many valid samples we have
+        var sumX = 0f
+        var sumY = 0f
+        var totalWeight = 0f
+
+        // Weight each corner by bilinear coefficients
+        if (f00 != null) {
+            val w = (1f - tx) * (1f - ty)
+            sumX += f00.x * w; sumY += f00.y * w; totalWeight += w
+        }
+        if (f10 != null) {
+            val w = tx * (1f - ty)
+            sumX += f10.x * w; sumY += f10.y * w; totalWeight += w
+        }
+        if (f01 != null) {
+            val w = (1f - tx) * ty
+            sumX += f01.x * w; sumY += f01.y * w; totalWeight += w
+        }
+        if (f11 != null) {
+            val w = tx * ty
+            sumX += f11.x * w; sumY += f11.y * w; totalWeight += w
+        }
+
+        if (totalWeight < 0.001f) {
+            // All neighbors are blocked — fall back to discrete lookup
+            val col = worldToCol(worldX)
+            val row = worldToRow(worldY)
+            return if (row in 0 until ROWS && col in 0 until COLS) field[row][col] else null
+        }
+
+        // Normalize result to unit vector
+        sumX /= totalWeight
+        sumY /= totalWeight
+        val len = sqrt(sumX * sumX + sumY * sumY)
+        return if (len > 0.001f) {
+            interpolatedResult.set(sumX / len, sumY / len)
+        } else {
+            val col = worldToCol(worldX)
+            val row = worldToRow(worldY)
+            if (row in 0 until ROWS && col in 0 until COLS) field[row][col] else null
+        }
+    }
+
+    /** Reusable Vector2 to avoid per-frame allocation in getInterpolatedFlow. */
+    private val interpolatedResult = Vector2()
+
+    private fun safeFlow(row: Int, col: Int, field: Array<Array<Vector2?>>): Vector2? {
         if (row < 0 || row >= ROWS || col < 0 || col >= COLS) return null
-        return flowToTop[row][col]
+        return field[row][col]
     }
 
     /**
@@ -108,54 +194,64 @@ class NavGrid(private val data: NavGridJson) {
      * @param defaultDir fallback direction for seed row tiles
      */
     private fun buildFlowField(seedRow: Int, output: Array<Array<Vector2?>>, defaultDir: Vector2) {
-        val dist = Array(ROWS) { IntArray(COLS) { Int.MAX_VALUE } }
+        // Use float distances for correct diagonal cost (sqrt(2) ≈ 1.414)
+        val dist = Array(ROWS) { FloatArray(COLS) { Float.MAX_VALUE } }
         val queue = LinkedList<Pair<Int, Int>>()
 
         for (c in 0 until COLS) {
             if (isWalkable(seedRow, c)) {
-                dist[seedRow][c] = 0
+                dist[seedRow][c] = 0f
                 queue.add(Pair(seedRow, c))
             }
         }
 
-        val dr = intArrayOf(-1, 1, 0, 0)
-        val dc = intArrayOf(0, 0, -1, 1)
+        // 8-direction BFS: cardinal + diagonal
+        val dr = intArrayOf(-1, 1, 0, 0, -1, -1, 1, 1)
+        val dc = intArrayOf(0, 0, -1, 1, -1, 1, -1, 1)
+        val cost = floatArrayOf(1f, 1f, 1f, 1f, SQRT2, SQRT2, SQRT2, SQRT2)
+
         while (queue.isNotEmpty()) {
             val (r, c) = queue.poll()
-            for (d in 0..3) {
+            for (d in 0..7) {
                 val nr = r + dr[d]
                 val nc = c + dc[d]
-                if (nr in 0 until ROWS && nc in 0 until COLS
-                    && isWalkable(nr, nc) && dist[nr][nc] > dist[r][c] + 1
-                ) {
-                    dist[nr][nc] = dist[r][c] + 1
+                if (nr !in 0 until ROWS || nc !in 0 until COLS) continue
+                if (!isWalkable(nr, nc)) continue
+                // For diagonal moves, require both adjacent cardinal tiles to be walkable
+                // (prevents corner-cutting through blocked diagonals)
+                if (d >= 4) {
+                    if (!isWalkable(r, nc) || !isWalkable(nr, c)) continue
+                }
+                val newDist = dist[r][c] + cost[d]
+                if (newDist < dist[nr][nc]) {
+                    dist[nr][nc] = newDist
                     queue.add(Pair(nr, nc))
                 }
             }
         }
 
+        // Build flow directions from distance gradient
         val tmpVec = Vector2()
         for (r in 0 until ROWS) {
             for (c in 0 until COLS) {
-                if (!isWalkable(r, c) || dist[r][c] == Int.MAX_VALUE) continue
+                if (!isWalkable(r, c) || dist[r][c] == Float.MAX_VALUE) continue
 
                 if (r == seedRow) {
                     output[r][c] = defaultDir.cpy()
                     continue
                 }
 
-                tmpVec.set(0f, 0f)
-                var bestDist = dist[r][c]
+                // Continuous gradient via cardinal central differences.
+                // Produces smooth directions instead of discrete 8-directional vectors.
+                // Blocked/OOB neighbors fall back to myDist → zero contribution on that axis.
+                val myDist = dist[r][c]
+                val dL = if (c > 0        && dist[r][c - 1] < Float.MAX_VALUE) dist[r][c - 1] else myDist
+                val dR = if (c < COLS - 1  && dist[r][c + 1] < Float.MAX_VALUE) dist[r][c + 1] else myDist
+                val dU = if (r > 0        && dist[r - 1][c] < Float.MAX_VALUE) dist[r - 1][c] else myDist
+                val dD = if (r < ROWS - 1  && dist[r + 1][c] < Float.MAX_VALUE) dist[r + 1][c] else myDist
 
-                for (d in 0..3) {
-                    val nr = r + dr[d]
-                    val nc = c + dc[d]
-                    if (nr in 0 until ROWS && nc in 0 until COLS && dist[nr][nc] < bestDist) {
-                        bestDist = dist[nr][nc]
-                        // Grid row+1 = down in image = lower Y in world → world Y = -1
-                        tmpVec.set(dc[d].toFloat(), -dr[d].toFloat())
-                    }
-                }
+                // Negative gradient = descent direction; convert row→worldY (row↓ = Y↑)
+                tmpVec.set(-(dR - dL), dD - dU)
 
                 if (tmpVec.len2() > 0f) {
                     output[r][c] = tmpVec.cpy().nor()
@@ -165,6 +261,7 @@ class NavGrid(private val data: NavGridJson) {
             }
         }
     }
+
 }
 
 @Serializable

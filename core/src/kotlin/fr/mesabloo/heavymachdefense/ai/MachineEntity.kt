@@ -6,6 +6,7 @@ import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.physics.box2d.Body
 import fr.mesabloo.heavymachdefense.PPM
 import fr.mesabloo.heavymachdefense.ui.stage.Machine
+import kotlin.math.abs
 
 /**
  * Bridges the visual [Machine] (Scene2D Group) and AI [GameObject] (Steerable) systems.
@@ -21,6 +22,20 @@ class MachineEntity(
 
     private var tagged = false
 
+    // --- Body rotation ---
+    /** Current body facing angle in degrees (0°=right, 90°=up). */
+    private var facingAngleDeg = 90f  // start facing up
+
+    init {
+        machine.rotation = 90f  // face upward from spawn
+    }
+
+    companion object {
+        private const val FIXED_DT = 1f / 60f
+        /** Turn rate (degrees/sec) for smooth return to default 90° after aimAt(). */
+        private const val BODY_TURN_RATE = 240f
+    }
+
     // --- GameObject abstracts ---
 
     override val objects: MutableList<GameObject> get() = allObjects
@@ -35,11 +50,14 @@ class MachineEntity(
 
     override fun walk() {
         machine.walking = true
+        // Body stays at default 90° (up) during movement.
+        // Only aimAt() rotates the body to face a target.
     }
 
     override fun stopInPlace() {
         machine.walking = false
-        body.setLinearVelocity(0f, 0f)
+        // Don't zero velocity — Machine's walking Action handles deceleration.
+        // The Action checks machine.walking each frame and smoothly reduces speed.
     }
 
     override fun aimAt(target: GameObject) {
@@ -47,10 +65,24 @@ class MachineEntity(
         val targetPos = target.getPosition()
         val angle = MathUtils.atan2(targetPos.y - myPos.y, targetPos.x - myPos.x) * MathUtils.radiansToDegrees
         machine.rotation = angle
+        facingAngleDeg = angle  // keep facing angle in sync with aim
     }
 
     override fun aimDefault() {
-        machine.rotation = 90f // face upward
+        // Smoothly return to default upward (90°) after target lost
+        facingAngleDeg = rotateToward(facingAngleDeg, 90f, BODY_TURN_RATE * FIXED_DT)
+        machine.rotation = facingAngleDeg
+    }
+
+    /** Shortest angular distance from [from] to [to] in degrees, range (-180, 180]. */
+    private fun shortAngleDist(from: Float, to: Float): Float =
+        ((to - from) % 360f + 540f) % 360f - 180f
+
+    /** Rotate [current] toward [target] by at most [maxDelta] degrees. */
+    private fun rotateToward(current: Float, target: Float, maxDelta: Float): Float {
+        val diff = shortAngleDist(current, target)
+        return if (abs(diff) <= maxDelta) target
+        else current + maxDelta * if (diff > 0f) 1f else -1f
     }
 
     // --- Location<Vector2> ---

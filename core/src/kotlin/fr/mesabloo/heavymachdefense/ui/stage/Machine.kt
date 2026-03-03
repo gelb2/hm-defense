@@ -112,20 +112,34 @@ class Machine(val kind: MachineKind, level: Int) : Group() {
     fun startWalkingAnimation(moveSpeed: Float) {
         val pBody = this.physicsBody ?: return
 
-        // Machines without feet (e.g. tanker): smooth constant movement, no foot animation
+        // Machines without feet (e.g. tanker): smooth constant movement with acceleration
         if (this.feetFrames == null) {
             this.addAction(object : Action() {
+                private var speedFactor = 0f
+                private val accelRate = 3.3f   // reach full speed in ~0.3s
+                private val decelRate = 5.0f   // stop in ~0.2s
+
                 override fun act(delta: Float): Boolean {
                     val machine = actor as Machine
                     if (!machine.isAlive) {
                         pBody.setLinearVelocity(0f, 0f)
                         return true
                     }
-                    if (!machine.walking) {
+
+                    // Accelerate or decelerate based on walking state
+                    if (machine.walking) {
+                        speedFactor = (speedFactor + accelRate * delta).coerceAtMost(1f)
+                    } else {
+                        speedFactor = (speedFactor - decelRate * delta).coerceAtLeast(0f)
+                    }
+
+                    if (speedFactor < 0.001f) {
+                        speedFactor = 0f
                         pBody.setLinearVelocity(0f, 0f)
                         return false
                     }
-                    val speed = moveSpeed / PPM
+
+                    val speed = (moveSpeed / PPM) * speedFactor
                     val flow = machine.navGrid?.getFlowToTop(pBody.position.x, pBody.position.y)
                     if (flow != null) {
                         pBody.setLinearVelocity(flow.x * speed, flow.y * speed)
@@ -157,6 +171,11 @@ class Machine(val kind: MachineKind, level: Int) : Group() {
             private val burstSpeed = moveSpeed * fullCycle / (stepDuration * 2f)
             private val swayAmount = 2.5f
 
+            // Acceleration: smoothly ramp up speed when starting to walk
+            private var speedFactor = 0f
+            private val accelRate = 2.5f   // reach full speed in ~0.4s (slower for heavy mechs)
+            private val decelRate = 5.0f   // stop in ~0.2s
+
             override fun act(delta: Float): Boolean {
                 val machine = actor as Machine
                 if (!machine.isAlive) {
@@ -165,15 +184,23 @@ class Machine(val kind: MachineKind, level: Int) : Group() {
                     rFoot.isVisible = false
                     return true // remove action on death
                 }
-                if (!machine.walking) {
-                    pBody.setLinearVelocity(0f, 0f)
-                    return false
+
+                // Update speed factor for acceleration/deceleration
+                if (machine.walking) {
+                    speedFactor = (speedFactor + accelRate * delta).coerceAtMost(1f)
+                } else {
+                    speedFactor = (speedFactor - decelRate * delta).coerceAtLeast(0f)
+                    if (speedFactor < 0.001f) {
+                        speedFactor = 0f
+                        pBody.setLinearVelocity(0f, 0f)
+                        return false
+                    }
                 }
 
                 elapsed += delta
                 val cycleTime = elapsed % fullCycle
 
-                val bSpeed = burstSpeed / PPM
+                val bSpeed = (burstSpeed / PPM) * speedFactor
                 val flow = machine.navGrid?.getFlowToTop(pBody.position.x, pBody.position.y)
 
                 when {
@@ -190,7 +217,7 @@ class Machine(val kind: MachineKind, level: Int) : Group() {
                         }
 
                         val progress = phaseTime / stepDuration
-                        actor.x += MathUtils.sin(progress * MathUtils.PI) * swayAmount
+                        actor.x += MathUtils.sin(progress * MathUtils.PI) * swayAmount * speedFactor
                     }
                     // Pause after left step
                     cycleTime < halfCycle -> {
@@ -209,7 +236,7 @@ class Machine(val kind: MachineKind, level: Int) : Group() {
                         }
 
                         val progress = phaseTime / stepDuration
-                        actor.x -= MathUtils.sin(progress * MathUtils.PI) * swayAmount
+                        actor.x -= MathUtils.sin(progress * MathUtils.PI) * swayAmount * speedFactor
                     }
                     // Pause after right step
                     else -> {

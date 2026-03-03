@@ -182,8 +182,6 @@ class StageAssetsManager : Disposable {
         ENEMY_TURRET_WEAPONS,
         TANK_BODIES,
         TANK_WEAPONS,
-        ENEMY_PLANE,
-        SHIPS,
         ALLY_BULLETS,
         SHELL_BULLETS,
         ENEMY_BULLETS,

@@ -13,6 +13,8 @@ buildscript {
 
 plugins {
     id "org.jetbrains.kotlin.jvm" version "2.1.0"
+    id "org.jetbrains.kotlin.android" version "2.1.0" apply false
+    id 'com.android.application' version '8.2.2' apply false
     id 'com.github.gmazzo.buildconfig' version "5.5.0"
     id 'org.jetbrains.kotlin.plugin.serialization' version '2.1.0'
 }
@@ -39,9 +41,13 @@ task packEffects(type: JavaExec) {
 
 allprojects {
     apply plugin: "eclipse"
-    apply plugin: "java"
-    apply plugin: "kotlin"
-    apply plugin: 'com.github.gmazzo.buildconfig'
+
+    // JVM plugins conflict with Android plugin — apply only to non-Android modules
+    if (project.name != 'android') {
+        apply plugin: "java"
+        apply plugin: "kotlin"
+        apply plugin: 'com.github.gmazzo.buildconfig'
+    }
 
     version = '1.0'
     ext {
@@ -76,17 +82,22 @@ project(":desktop") {
         api "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop"
         api "com.badlogicgames.gdx:gdx-box2d-platform:$gdxVersion:natives-desktop"
     }
+
+    // Run core tests before desktop compile (classes doesn't depend on core:jar)
+    tasks.named('compileKotlin') { dependsOn ':core:test' }
 }
 
 project(":core") {
     apply plugin: "java-library"
     apply plugin: "org.jetbrains.kotlin.plugin.serialization"
 
+    sourceSets {
+        test.kotlin.srcDirs = ["src/test/kotlin"]
+    }
+
     dependencies {
         api "com.badlogicgames.gdx:gdx:$gdxVersion"
         api "com.badlogicgames.gdx:gdx-box2d:$gdxVersion"
-
-        api "com.badlogicgames.gdx:gdx-backend-lwjgl3:$gdxVersion"
 
         // LibKTX: port of LibGDX for Kotlin
         api "io.github.libktx:ktx-app:$ktxVersion"
@@ -107,5 +118,19 @@ project(":core") {
 
         // JSON (de)serialization
         implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3'
+
+        // Test dependencies
+        testImplementation "org.jetbrains.kotlin:kotlin-test-junit5:2.1.0"
+        testImplementation "org.junit.jupiter:junit-jupiter:5.10.0"
+        testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+
+        // Headless LibGDX backend for tests needing Vector2, Gdx.files, etc.
+        testImplementation "com.badlogicgames.gdx:gdx-backend-headless:$gdxVersion"
+        testImplementation "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop"
+        testImplementation "com.badlogicgames.gdx:gdx-box2d-platform:$gdxVersion:natives-desktop"
+    }
+
+    test {
+        useJUnitPlatform()
     }
 }

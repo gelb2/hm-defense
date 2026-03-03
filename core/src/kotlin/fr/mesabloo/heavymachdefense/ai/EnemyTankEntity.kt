@@ -17,8 +17,30 @@ class EnemyTankEntity(
 ) : GameObject() {
 
     var paralyzedTimer: Float = 0f
+        set(value) {
+            // Reset speed factor when paralysis begins (smooth re-acceleration on recovery)
+            if (value > 0f && field <= 0f) speedFactor = 0f
+            field = value
+        }
 
     private var tagged = false
+
+    // --- Acceleration/deceleration ---
+    /** Speed factor 0.0 (stopped) to 1.0 (full speed). Smoothly transitions. */
+    private var speedFactor = 0f
+
+    init {
+        tank.rotation = -90f  // enemies face downward from spawn
+    }
+
+    companion object {
+        /** Fixed timestep matching world.step(1/60f) */
+        private const val FIXED_DT = 1f / 60f
+        /** Reach full speed in ~0.3s */
+        private const val ACCEL_RATE = 3.3f
+        /** Stop in ~0.2s */
+        private const val DECEL_RATE = 5.0f
+    }
 
     // --- GameObject abstracts ---
 
@@ -36,18 +58,37 @@ class EnemyTankEntity(
         if (paralyzedTimer > 0f) return
         tank.walking = true
 
-        val speed = moveSpeed / PPM
+        // Body stays at fixed -90° (down). Only weapon rotates via aimAt().
+        speedFactor = (speedFactor + ACCEL_RATE * FIXED_DT).coerceAtMost(1f)
+        applyFlowVelocity()
+    }
+
+    override fun stopInPlace() {
+        tank.walking = false
+
+        // Decelerate toward stop (Arrive behavior)
+        speedFactor = (speedFactor - DECEL_RATE * FIXED_DT).coerceAtLeast(0f)
+
+        if (speedFactor > 0.001f) {
+            // Still decelerating — maintain flow field direction at reduced speed
+            applyFlowVelocity()
+        } else {
+            speedFactor = 0f
+            body.setLinearVelocity(0f, 0f)
+        }
+    }
+
+    /**
+     * Apply velocity along flow field direction, scaled by current [speedFactor].
+     */
+    private fun applyFlowVelocity() {
+        val speed = (moveSpeed / PPM) * speedFactor
         val flow = navGrid?.getFlowToBase(body.position.x, body.position.y)
         if (flow != null) {
             body.setLinearVelocity(flow.x * speed, flow.y * speed)
         } else {
             body.setLinearVelocity(0f, -speed) // fallback: straight down
         }
-    }
-
-    override fun stopInPlace() {
-        tank.walking = false
-        body.setLinearVelocity(0f, 0f)
     }
 
     override fun aimAt(target: GameObject) {
@@ -94,13 +135,13 @@ class EnemyTankEntity(
         this.tagged = tagged
     }
 
-    // --- Limiter (minimal, steering behaviors not used) ---
+    // --- Limiter ---
 
     override fun getZeroLinearSpeedThreshold(): Float = 0.001f
     override fun setZeroLinearSpeedThreshold(value: Float) {}
     override fun getMaxLinearSpeed(): Float = moveSpeed / PPM
     override fun setMaxLinearSpeed(value: Float) {}
-    override fun getMaxLinearAcceleration(): Float = 0f
+    override fun getMaxLinearAcceleration(): Float = ACCEL_RATE * moveSpeed / PPM
     override fun setMaxLinearAcceleration(value: Float) {}
     override fun getMaxAngularSpeed(): Float = 0f
     override fun setMaxAngularSpeed(value: Float) {}

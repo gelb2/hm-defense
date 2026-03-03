@@ -9,7 +9,7 @@ import fr.mesabloo.heavymachdefense.ui.stage.BuildMachineItem
 import fr.mesabloo.heavymachdefense.ui.stage.BuildQueue
 import fr.mesabloo.heavymachdefense.ui.stage.slots.BuildSlot
 import fr.mesabloo.heavymachdefense.ui.stage.slots.MachineBuildSlot
-import fr.mesabloo.heavymachdefense.ui.stage.slots.TurretBuildSlot
+
 import kotlin.reflect.KMutableProperty0
 
 class BuildMachineIfPossible(
@@ -22,18 +22,15 @@ class BuildMachineIfPossible(
     ClickListener() {
     override fun clicked(event: InputEvent?, x: Float, y: Float) {
         if (!this.slot.isDisabled && !this.upgradeMenuShown.get()) {
-            val currentCells = this.cells.get()
+            val item = when (this.slot) {
+                is MachineBuildSlot -> BuildMachineItem(this.slot.kind, this.slot.level, this.builds)
+                else -> return  // Turret build not yet implemented
+            }
 
-            this.cells.set(currentCells - this.slot.cellCost)
+            if (this.cells.get() < this.slot.cellCost) return  // guard against fast double-tap
+            this.cells.set(this.cells.get() - this.slot.cellCost)
             stageAssetsManager.playUiSound(StageAssetsManager.SOUND_BUILD_MACH)
-
-            this.buildQueue.build(
-                when (this.slot) {
-                    is MachineBuildSlot -> BuildMachineItem(this.slot.kind, this.slot.level, this.builds)
-                    is TurretBuildSlot -> TODO()
-                    else -> TODO()
-                }
-            )
+            this.buildQueue.build(item)
         }
     }
 }

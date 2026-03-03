@@ -29,6 +29,7 @@ import fr.mesabloo.heavymachdefense.entities.createTerrainBody
 import ktx.box2d.body
 import ktx.box2d.box
 import fr.mesabloo.heavymachdefense.data.Specials
+import fr.mesabloo.heavymachdefense.listeners.ShowComingSoon
 import fr.mesabloo.heavymachdefense.listeners.stage.*
 import fr.mesabloo.heavymachdefense.managers.BackgroundMusicManager
 import fr.mesabloo.heavymachdefense.managers.WaveManager
@@ -111,6 +112,9 @@ class StageScreen(
     private val specials: Specials = Json.decodeFromString(Gdx.files.internal("data/special-info.json").readString())
 
     private var upgradeMenuShown: Boolean = false
+
+    /** When true, all gameplay systems are frozen (physics, AI, spawning, Scene2D actions on terrain). */
+    var gamePaused: Boolean = false
 
     private lateinit var title: Title
     private lateinit var terrain: Terrain
@@ -196,16 +200,16 @@ class StageScreen(
             scrollpane = it
 
             val yOffset = 180f
+            val hpGaugeReserve = 35f  // HP gauge height (32) + gap (3)
 
-            it.setBounds(128f, yOffset, 512f, UI_HEIGHT - yOffset)
+            it.setBounds(128f, yOffset, 512f, UI_HEIGHT - yOffset - hpGaugeReserve)
             it.setSmoothScrolling(true)
             it.setScrollbarsVisible(false)
             it.setScrollingDisabled(true, false)
             it.setOverscroll(false, false)
 
             it.layout()
-            it.scrollTo(0f, 0f, 512f, 1024f - yOffset)
-            //it.layout()
+            it.scrollTo(0f, 0f, 512f, UI_HEIGHT - yOffset - hpGaugeReserve)
         })
 
         this.background.addActor(HpGauges(this::playerLife, this::enemyLife).also {
@@ -217,7 +221,7 @@ class StageScreen(
         this.background.addActor(MachSlot().also {
             it.setPosition(UI_WIDTH - it.width, 57f)
         })
-        this.background.addActor(CellCounter(this::maxCells, this::currentCells).also {
+        this.background.addActor(CellCounter(this::maxCells, this::currentCells, this.cellResearchMultiplier).also {
             it.setPosition(652f, 995f)
         })
         this.background.addActor(
@@ -256,36 +260,22 @@ class StageScreen(
 
             var currentY = contentHeight - 76f
             for (slot in this.save.buildSlots) {
-                it.addActor(when (slot) {
+                val buildSlot = when (slot) {
                     is MachineSlot -> MachineBuildSlot(
-                        slot,
-                        this.save,
-                        this.builds,
-                        this::currentCells,
-                        this.buildQueue
+                        slot, this.save, this.builds, this::currentCells, this.buildQueue
                     )
                     is TurretSlot -> TurretBuildSlot(
-                        slot,
-                        this.save,
-                        this.builds,
-                        this::currentCells,
-                        this.buildQueue
+                        slot, this.save, this.builds, this::currentCells, this.buildQueue
                     )
-                    else -> TODO()
-                }.also {
-                    it.setPosition(40f, currentY)
-
-                    it.addListener(
-                        BuildMachineIfPossible(
-                            it,
-                            this::currentCells,
-                            this.buildQueue,
-                            this.builds,
-                            this::upgradeMenuShown
-                        )
+                    else -> continue
+                }
+                buildSlot.setPosition(40f, currentY)
+                buildSlot.addListener(
+                    BuildMachineIfPossible(
+                        buildSlot, this::currentCells, this.buildQueue, this.builds, this::upgradeMenuShown
                     )
-                })
-
+                )
+                it.addActor(buildSlot)
                 currentY -= 102f
             }
 
@@ -305,16 +295,15 @@ class StageScreen(
 
             var currentY = SLOT_MENU_HEIGHT - 76f
             for (slot in this.save.specialSlots) {
-                it.addActor(when (slot) {
+                val buildSlot = when (slot) {
                     is SpecialSlot -> SpecialBuildSlot(slot, this.save, this.specials)
-                    else -> TODO()
-                }.also { buildSlot ->
-                    buildSlot.setPosition(40f, currentY)
-                    buildSlot.addListener(UseSpecialAttack(buildSlot, this::upgradeMenuShown) { slot ->
-                        executeSpecialAttack(slot.kind)
-                    })
+                    else -> continue
+                }
+                buildSlot.setPosition(40f, currentY)
+                buildSlot.addListener(UseSpecialAttack(buildSlot, this::upgradeMenuShown) { slot ->
+                    executeSpecialAttack(slot.kind)
                 })
-
+                it.addActor(buildSlot)
                 currentY -= 102f
             }
 
@@ -329,6 +318,7 @@ class StageScreen(
             this.upgradeEquipButton = it
 
             it.setPosition(650f, 180f)
+            it.addListener(ShowComingSoon(this.ui))
         })
 
         val controlsGroup = Group()
@@ -392,14 +382,16 @@ class StageScreen(
 
         this.gameWorld = GameWorld(this.terrain)
         this.navGrid = NavGrid.load(level)
+        this.gameWorld.navGrid = this.navGrid
 
         createTerrainBody(this.gameWorld)
         val basesResult = createBases(this.gameWorld, this.upgrades, this::save)
         this.allyBase = basesResult.allyBase
 
         // Register bases as targetable game objects
-        this.allyBaseEntity = BaseEntity(basesResult.allyBase, basesResult.allyBody, this.gameObjects, Team.ALLY, 500, 500)
-        this.enemyBaseEntity = BaseEntity(basesResult.enemyBase, basesResult.enemyBody, this.gameObjects, Team.ENEMY, 500, 500)
+        val allyBaseHp = this.upgrades.base_defense[(this.save.mainUpgrades[UpgradeKind.BASE_DEFENSE] ?: 1).coerceIn(1..this.upgrades.base_defense.size) - 1].defense.toInt()
+        this.allyBaseEntity = BaseEntity(basesResult.allyBase, basesResult.allyBody, this.gameObjects, Team.ALLY, allyBaseHp, allyBaseHp)
+        this.enemyBaseEntity = BaseEntity(basesResult.enemyBase, basesResult.enemyBody, this.gameObjects, Team.ENEMY, 10000, 10000)
         this.gameObjects.add(allyBaseEntity)
         this.gameObjects.add(enemyBaseEntity)
 
@@ -1057,9 +1049,14 @@ class StageScreen(
         this.baseDefenseLevel = this.save.mainUpgrades[UpgradeKind.BASE_DEFENSE] ?: 1
         this.baseAttackLevel = this.save.mainUpgrades[UpgradeKind.BASE_CANNON] ?: 1
 
+        // Sync pause state to Terrain before ui.act() so gameplay actors get delta=0
+        if (::terrain.isInitialized) {
+            this.terrain.gamePaused = this.gamePaused
+        }
+
         super.render(delta)
 
-        if (!this.isLoading) {
+        if (!this.isLoading && !this.gamePaused) {
             // Game end countdown
             if (gameEnded) {
                 gameEndTimer += delta
@@ -1115,6 +1112,10 @@ class StageScreen(
                             obj.tank.remove()
                             spawnEffect("explode-npc", deathPos)
                             stageAssetsManager.sound(StageAssetsManager.SOUND_GROUND_EXPLOSION).play(this.effectsVolume)
+
+                            // Award credits for enemy kill (base = maxHp/10, scaled by CR_RESEARCH)
+                            val reward = (obj.tank.maxHp / 10 * this.crResearchMultiplier).toLong().coerceAtLeast(1L)
+                            this.save.credits += reward
                         }
                     }
                     true
@@ -1141,13 +1142,22 @@ class StageScreen(
                 gameEnded = true
                 gameEndTimer = 0f
                 isVictory = true
+
+                // Stage clear credit reward: base 500 + 100 per level, scaled by CR_RESEARCH
+                val clearBonus = ((500L + this.level * 100L) * this.crResearchMultiplier).toLong()
+                this.save.credits += clearBonus
+                Gdx.app.debug(this.javaClass.simpleName, "Stage ${this.level} clear bonus: $clearBonus credits")
+
                 // Unlock next stage if this is the furthest cleared
                 if (this.level > this.save.lastStageCompleted) {
                     this.save.lastStageCompleted = this.level.coerceAtMost(79)
-                    Gdx.app.getPreferences(GameSave.PREFERENCES_PATH).flush {
-                        this[this@StageScreen.saveIndex.toString()] = Json.encodeToString(this@StageScreen.save)
-                    }
                 }
+
+                // Persist save (credits + stage progress)
+                Gdx.app.getPreferences(GameSave.PREFERENCES_PATH).flush {
+                    this[this@StageScreen.saveIndex.toString()] = Json.encodeToString(this@StageScreen.save)
+                }
+
                 showGameResult(true)
             }
         }

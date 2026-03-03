@@ -33,12 +33,21 @@ class StartScreen(game: MainGame, isLoading: Boolean = false) : AbstractScreen(g
     private val tweenManager = TweenManager()
 
     init {
-        Tween.registerAccessor(
-            com.badlogic.gdx.backends.lwjgl3.audio.Mp3.Music::class.java,
-            MusicAccessor<com.badlogic.gdx.backends.lwjgl3.audio.Mp3.Music>()
+        // Tween engine needs concrete Music classes, not the Music interface.
+        // Register all known backend implementations via reflection for platform independence.
+        val musicClasses = listOf(
+            "com.badlogic.gdx.backends.lwjgl3.audio.Mp3\$Music",
+            "com.badlogic.gdx.backends.lwjgl3.audio.Ogg\$Music",
+            "com.badlogic.gdx.backends.lwjgl3.audio.Wav\$Music",
+            "com.badlogic.gdx.backends.android.AndroidMusic"
         )
-        // TODO: insert for all platforms and for all kinds of formats
-        //       this is because Tween doesn't support walking on interfaces (and Music is one)
+        @Suppress("UNCHECKED_CAST")
+        val accessor = MusicAccessor<com.badlogic.gdx.audio.Music>() as aurelienribon.tweenengine.TweenAccessor<*>
+        for (className in musicClasses) {
+            try {
+                Tween.registerAccessor(Class.forName(className), accessor)
+            } catch (_: ClassNotFoundException) { }
+        }
     }
 
     override fun show() {

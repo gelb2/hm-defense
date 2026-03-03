@@ -82,10 +82,29 @@
 - [x] ~~`ENEMY_PLANE` / `SHIPS` 에셋 — 매 스테이지 로딩하지만 사용처 없음~~ (allAtlases()에서 제거, 메모리 절약)
 - [x] ~~`Radar Border.init` — 자식 추가 주석 처리~~ (삭제됨)
 
-## 6. 기존 진행 중 항목
+## 6. 비주얼 / UI 버그
+
+- [ ] **HP 게이지 겹침** — HP바가 기지 건물을 가림. 원인: Base 액터가 Terrain(ScrollPane 내부) 안에서 `toFront()`로 올라와 HP 게이지 영역과 시각적으로 겹침. ScrollPane 높이 조정으로는 해결 안됨 — z-order/렌더 레이어 분리 필요
+- [x] ~~**유닛 사선 회전** — `updateBodyRotation()`이 flow field 방향으로 몸체 전체를 회전시켜 사선 비틀림 유발~~ (updateBodyRotation 제거, 머신 90°/적탱크 -90° 고정)
+- [ ] **타겟 소멸 후 정면 정렬** — 적 파괴 후 머신/적 유닛이 정면 방향으로 재정렬되는지 확인 필요 (aimDefault()로 처리하나 시각 검증 미완)
+
+## 7. NavGrid / 지형 통과 버그
+
+- [ ] **Stage 14 (terrain-21) 물/다리 통과** — NavGrid 데이터 존재하나 물 타일이 walkable=true로 잘못 표시되었거나, 런타임에서 blocked 타일 진입을 강제하지 않음. adjustUnitVelocities()에 `isBlockedAt()` 가드 없음
+- [ ] **NavGrid 데이터 검증 도구** — 전 terrain NavGrid JSON의 정확성을 시각적으로 검증하는 도구 필요 (tools/로 이동 예정)
+- [ ] **런타임 blocked 타일 가드** — flow field가 올바르더라도, 충돌 회피 등으로 밀려난 유닛이 blocked 타일로 진입할 수 있음. adjustUnitVelocities()에 `navGrid.isBlockedAt()` 체크 추가 필요
+
+## 8. Android 빌드
+
+- [ ] **Android 모듈 생성** — `android/` 디렉토리, build.gradle, AndroidManifest.xml, AndroidLauncher.kt 전부 새로 생성 필요
+- [ ] **settings.gradle 업데이트** — `include ':android'` 추가
+- [ ] **local.properties** — `sdk.dir` 설정 (사용자 환경에 따라)
+- [ ] **앱 설정 결정** — minSdk(21), targetSdk(34+), 앱ID, 화면 방향(세로 고정)
+- [ ] **서명키** — 디버그 APK는 자동 생성, 릴리스용은 keystore 별도 생성 필요
+- [ ] **에셋 크기 최적화** — 텍스처/사운드 크기 Android 기기용 검토
+
+## 9. 기존 진행 중 항목
 
 - [ ] 미사일 투사체 트레일 이펙트 (하얀 굵은 실/연기) — 시도 2회 롤백, 방법 미정
 - [ ] 창 리사이즈 시 UI 깨짐 — FitViewport 리사이즈 처리 문제
 - [ ] 유닛 충돌 회피 잔여 떨림 — 대량(20+) 밀집 시. 파라미터 튜닝 또는 적 유닛 vel.x 유지 검토
-- [ ] NavGrid 패스파인딩 — 32×32 타일 그리드 기반 A* 구현
-- [ ] **아군 머신 사선 정렬** — 장애물 근처에서 발생 가능. buildFlowField()를 cardinal central difference 연속 그래디언트로 교체 완료. 열린 지형에서는 해결, 장애물 근처 효과는 실행 확인 필요. adjustUnitVelocities의 separation X-force가 2차 원인으로 남아있음

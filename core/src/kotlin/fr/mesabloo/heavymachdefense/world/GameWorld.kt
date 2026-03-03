@@ -9,6 +9,7 @@ import fr.mesabloo.heavymachdefense.BG_BORDER
 import fr.mesabloo.heavymachdefense.PPM
 import fr.mesabloo.heavymachdefense.TERRAIN_WIDTH
 import fr.mesabloo.heavymachdefense.ifDebug
+import fr.mesabloo.heavymachdefense.data.NavGrid
 import fr.mesabloo.heavymachdefense.ui.stage.Terrain
 import ktx.actors.contains
 import ktx.box2d.createWorld
@@ -16,6 +17,8 @@ import kotlin.math.abs
 import kotlin.math.sqrt
 
 class GameWorld(private val terrain: Terrain) : Disposable {
+    /** NavGrid for blocked-tile enforcement during velocity adjustment. */
+    var navGrid: NavGrid? = null
     val world: World = createWorld()
 
     private val debugRenderer = Box2DDebugRenderer()
@@ -125,6 +128,10 @@ class GameWorld(private val terrain: Terrain) : Disposable {
         // --- Off-screen spawn: visibility boundaries (pixels) ---
         private const val VISIBLE_BOTTOM_PX = 0f
         private const val VISIBLE_TOP_PX = 2048f
+
+        // --- NavGrid enforcement ---
+        /** Look-ahead time (seconds) for blocked-tile check: 1 physics step */
+        private const val BLOCKED_TILE_LOOKAHEAD = 1f / 60f
 
         // --- Spatial hash ---
         /** Cell size for spatial hash (world units). Must be >= INFLUENCE_RADIUS. */
@@ -347,6 +354,14 @@ class GameWorld(private val terrain: Terrain) : Disposable {
                     if (targetX < 0f && x - hw < 0.1f) targetX = 0f
                     if (targetX > 0f && x + hw > terrainMaxX - 0.1f) targetX = 0f
 
+                    // NavGrid blocked-tile enforcement: prevent entering impassable tiles
+                    val grid = navGrid
+                    if (grid != null && !grid.isBlockedAt(x, y)) {
+                        val step = BLOCKED_TILE_LOOKAHEAD
+                        if (targetX != 0f && grid.isBlockedAt(x + targetX * step, y)) targetX = 0f
+                        if (targetY != 0f && grid.isBlockedAt(x, y + targetY * step)) targetY = 0f
+                    }
+
                     // Smooth velocity transition to reduce jitter
                     val prev = lastVelocity[body]
                     if (prev != null) {
@@ -370,19 +385,29 @@ class GameWorld(private val terrain: Terrain) : Disposable {
                 }
                 isOffScreen && abs(overlapVel) > 0.001f -> {
                     // Off-screen: raw fast separation velocity (no smoothing)
-                    val clampedVel = when {
+                    var clampedVel = when {
                         overlapVel < 0f && x - hw < 0.1f -> 0f
                         overlapVel > 0f && x + hw > terrainMaxX - 0.1f -> 0f
                         else -> overlapVel
+                    }
+                    // NavGrid: prevent off-screen units from being pushed into blocked tiles
+                    val grid = navGrid
+                    if (grid != null && !grid.isBlockedAt(x, y) && clampedVel != 0f) {
+                        if (grid.isBlockedAt(x + clampedVel * BLOCKED_TILE_LOOKAHEAD, y)) clampedVel = 0f
                     }
                     body.setLinearVelocity(clampedVel, vel.y)
                 }
                 !isMoving && abs(overlapVel) > 0.001f -> {
                     // Paused but overlapping: gentle separation velocity
-                    val clampedVel = when {
+                    var clampedVel = when {
                         overlapVel < 0f && x - hw < 0.1f -> 0f
                         overlapVel > 0f && x + hw > terrainMaxX - 0.1f -> 0f
                         else -> overlapVel
+                    }
+                    // NavGrid: prevent paused units from being pushed into blocked tiles
+                    val grid = navGrid
+                    if (grid != null && !grid.isBlockedAt(x, y) && clampedVel != 0f) {
+                        if (grid.isBlockedAt(x + clampedVel * BLOCKED_TILE_LOOKAHEAD, y)) clampedVel = 0f
                     }
                     val prev = lastVelocity[body]
                     val prevX = prev?.get(0) ?: 0f

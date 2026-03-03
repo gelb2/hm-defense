@@ -1,7 +1,20 @@
 # Changelog
 
-## 2026-03-03 — 유닛 사선 회전 수정 + HP바 겹침 해소
+## 2026-03-03 — NavGrid 가드 + Android 빌드 + 유닛 사선 회전 수정
 
+- **NavGrid blocked-tile 런타임 가드** (GameWorld.kt)
+  - `adjustUnitVelocities()`에서 속도 조정 후 다음 프레임 위치가 blocked 타일인지 per-axis 체크
+  - 유닛 분리력으로 물/벽으로 밀려나는 것을 방지 (Stage 14 다리/물 통과 버그 수정)
+  - on-screen 이동, off-screen 분리, 정지 중 분리 3가지 경로 모두 가드 추가
+- **Android 빌드 인프라** (android/ 모듈 신규)
+  - Android 모듈 생성: build.gradle, AndroidManifest.xml, AndroidLauncher.kt
+  - AGP 8.2.2, minSdk 21, targetSdk 34, 세로 고정
+  - `./gradlew :android:assembleDebug` → 55MB debug APK 생성 확인
+  - 네이티브 .so 자동 추출 (armeabi-v7a, arm64-v8a, x86, x86_64)
+  - placeholder 앱 아이콘 + ProGuard 룰 포함
+- **Core LWJGL3 의존성 분리** (build.gradle, StartScreen.kt)
+  - Core에서 `gdx-backend-lwjgl3` 제거 — Android 백엔드와 충돌 방지
+  - MusicAccessor 등록을 리플렉션 기반으로 전환 (플랫폼 독립)
 - **유닛 몸체 사선 회전 수정** (MachineEntity.kt, EnemyTankEntity.kt)
   - `updateBodyRotation()` 제거 — flow field 방향 따라 몸체 회전하던 로직이 사선 비틀림 유발
   - 아군 머신: 기본 90° (상방) 고정, `aimAt()` 시에만 타겟 방향 회전, 타겟 잃으면 90°로 복귀

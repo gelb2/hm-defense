@@ -382,6 +382,7 @@ class StageScreen(
 
         this.gameWorld = GameWorld(this.terrain)
         this.navGrid = NavGrid.load(level)
+        this.gameWorld.navGrid = this.navGrid
 
         createTerrainBody(this.gameWorld)
         val basesResult = createBases(this.gameWorld, this.upgrades, this::save)
